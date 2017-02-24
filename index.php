@@ -12,12 +12,30 @@
         echo '404, route not found!';
     });
 
-    // Static route: /
-    $router->get('/(\w*)', function () {
+    // result route: /
+    $router->get('/(results)', function ($module) {
 
         // call the tempate
-        $main = new MainController();
+        $main = new MainController($module);
+        $main->run_analysis();
         $main->show_template();
+    });
+
+    // setup route: /
+    $router->get('/(setup)', function ($module) {
+
+        // call the tempate
+        $main = new MainController($module);
+        $main->run_analysis();
+        $main->show_template();
+    });
+
+    // setup route: /
+    $router->get('/(\w*)', function ($module) {
+
+        //route to right location
+        header('Location: /' . SITEURL . 'setup');
+        exit();
     });
 
     // Thunderbirds are go!

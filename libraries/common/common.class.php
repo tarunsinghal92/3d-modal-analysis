@@ -32,13 +32,36 @@ class Common{
   }
 
   /**
+   * zero array 2d
+   */
+  public function initialize_matrix($n)
+  {
+      $t = array_fill(0, $n, 0.0);
+      return array_fill(0, $n, $t);
+  }
+
+  /**
   *
   * print full array
   */
-  public function dump($data){
-    echo "<pre>";
-    print_r($data);
-    echo "</pre>";
+  public function dump($data, $flag = false){
+      if(DEBUG || $flag){
+          echo "<pre>";
+          print_r($data);
+          echo "</pre>";
+      }
+  }
+
+  /**
+   * print matrix
+   */
+  public function show($matrix)
+  {
+      if(DEBUG){
+          echo '<pre>';
+          print($matrix);
+          echo '</pre>';
+      }
   }
 
   /**

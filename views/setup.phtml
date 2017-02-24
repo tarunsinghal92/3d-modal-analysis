@@ -1,0 +1,33 @@
+<style>
+  #slider{
+    position: fixed;
+    width: 80%;
+    margin: 20px 10%;
+    top: 0;
+  }
+
+</style>
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+<div id="slider"></div>
+<canvas id="myCanvas" width="2000" height="1000"></canvas>
+<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+<script>
+    var legend = JSON.parse('<?php echo json_encode($this->results['plot']['legends']); ?>');
+    var data = JSON.parse('<?php echo json_encode($this->results['plot']['data']); ?>');
+    draw_plot('container', legend, data);
+    setup_canvas(JSON.parse('<?php echo json_encode($this->results['canvas']); ?>'))
+
+    $( "#slider" ).slider({
+        step: 1,
+        min: 0,
+        max: <?php echo count($this->results['plot']['legends']) ?>,
+        change: function( event, ui ) {
+            draw_analysis(ui.value);
+        }
+    });
+
+    setInterval(function(){
+        old = $('#slider').slider( "option", "value");
+        $('#slider').slider("value",old + 1);
+    }, 30);
+</script>

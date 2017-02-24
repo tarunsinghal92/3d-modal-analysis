@@ -2,25 +2,60 @@
 
 /**
  * Main Controller Class
+ *
+ * @author Tarun K. Singhal <tarun.singhal@mail.utoronto.ca>
+ *
  */
 
 class MainController extends Common{
 
-    //all results
+    /**
+     * [$results description]
+     * @var [type]
+     */
     private $results;
 
-    //default function
-    public function __construct(){
+    /**
+     * [$module description]
+     * @var [type]
+     */
+    private $module;
 
-      //get the results
-      $this->results = new TrussModel();
-      $this->results->run();
+    /**
+     * [__construct description]
+     * @param [type] $module [description]
+     */
+    public function __construct($module){
+
+        //define var
+        $this->module = $module;
     }
 
+    /**
+     * [run_analysis description]
+     * @return boolean [description]
+     */
+    public function run_analysis()
+    {
+        $obj = new ModalAnalysis();
+        $obj->run();
+        $this->results = $obj->getResults();
+    }
+
+    /**
+     * [show_template description]
+     * @return [type] [description]
+     */
     public function show_template(){
 
+        //include head scripts
+        require_once 'views/header.phtml';
+
         //show template
-        require_once 'views/main.phtml';
+        require_once 'views/' . $this->module . '.phtml';
+
+        //include footer
+        require_once 'views/footer.phtml';
     }
 }
 
