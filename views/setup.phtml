@@ -7,7 +7,6 @@
   }
 
 </style>
-<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
 <div id="slider"></div>
 <canvas id="myCanvas" width="2000" height="1000"></canvas>
 <div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
@@ -22,6 +21,9 @@
         min: 0,
         max: <?php echo count($this->results['plot']['legends']) ?>,
         change: function( event, ui ) {
+            draw_analysis(ui.value);
+        },
+        slide: function( event, ui ) {
             draw_analysis(ui.value);
         }
     });

@@ -76,4 +76,21 @@ class Common{
     return NULL;
   }
 
+  public function table($array)
+  {
+      $array = $array->map(function($x) {
+          return round($x, 1);
+      });
+      $array = $array->getMatrix();
+      print('<table>');
+      for($i = 0; $i < count($array); $i++) {
+          print('<tr>');
+          for($ii = 0; $ii < count($array[$i]); $ii++) {
+              print("<td>{$array[$i][$ii]}</td>");
+          }
+          print('</tr>');
+      }
+      print('</table>');
+  }
+
 }

@@ -3,27 +3,21 @@
 /**
  * SITEURL
  */
-define('SITEURL', '2dtrussdeflection/');
+define('SITEURL', '3d-modal-analysis/');
 
 /**
- * Young modulus
- * assumed same to all members
+ * magnifying factor
  */
-define('E', '29000');
+define('OVERALL_MAG', 30);
 
 /**
- * magnifying factor of displacements
+ * magnifying factor
  */
-define('MAGNIFICATION_FACTOR', 5.0);
+define('DISP_MAG', 200);
 
 /**
- * length amplification factor for unit conversion
+ * DEBUG MODE
  */
-define('LENGTH_FACTOR', 12.0);
-
-/**
- * magnifying factor in general
- */
-define('GENERAL_MAGNIFICATION_FACTOR', 1.5);
+define('DEBUG', true);
 
 ?>

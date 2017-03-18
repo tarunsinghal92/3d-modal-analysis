@@ -4,14 +4,20 @@
  * Modal Analysis Class
  *
  * @TODO
- *  0. Newmark Implement done!!!
+ *  0. Newmark Implement Done!!!
  *  1. convert 2d to 3d (NOPES)
  *  2. add shearwalls
  *  3. interpolation function to get shear wall stresses
  *  4. UI
  *  5. Time step variation done!!!
- *  6. Non-linear Analysis (NOPES)
- *  7. Discuss whatever you have done!!!
+ *  6. Non-linear Analysis (only for shearwall)
+ *  7. Discuss whatever you have Done!!!
+ *  8. Report/PPT/Flyer
+ *
+ * @Question
+ *  1. how to consider deflection in column (linear / nonlinear) ??? Not Clear
+ *  2. Shear wall analysis (interpolation / MCFT) YES
+ *  3. Is it fine without 3d? OK
  *
  * @author Tarun K. Singhal <tarun.singhal@mail.utoronto.ca>
  *
@@ -33,6 +39,7 @@ class ModalAnalysis extends Common
     private $eqData;
     private $results;
     private $numFloors = 5;
+    private $wallThickness = 0.1; // m
     private $massFloor = 407; //kg
     private $floorWidth = 6; //m
     private $youngModulusMultI = 60000;  // KN m2
@@ -327,6 +334,9 @@ class ModalAnalysis extends Common
 
         //floor stiffness
         $k = 12 * $this->youngModulusMultI / ($this->heightColumn * $this->heightColumn * $this->heightColumn);
+
+        //shearwall stuffness @http://ef.engr.utk.edu/ce576-2014-01/notes/Shear-Walls.pdf
+        // $k = ;
 
         //2DOF stiffness
         $stiffness2DOF = [

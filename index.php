@@ -31,6 +31,15 @@
     });
 
     // setup route: /
+    $router->get('/(setup2)', function ($module) {
+
+        // call the tempate
+        $main = new MainController($module);
+        $main->run_shear_analysis();
+        // $main->show_template();
+    });
+
+    // setup route: /
     $router->get('/(\w*)', function ($module) {
 
         //route to right location

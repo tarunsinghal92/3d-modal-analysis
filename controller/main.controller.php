@@ -43,6 +43,16 @@ class MainController extends Common{
     }
 
     /**
+     * [run_shear_analysis description]
+     * @return boolean [description]
+     */
+    public function run_shear_analysis()
+    {
+        $obj = new ShearWallAnalysis();
+        $obj->run();
+    }
+
+    /**
      * [show_template description]
      * @return [type] [description]
      */
