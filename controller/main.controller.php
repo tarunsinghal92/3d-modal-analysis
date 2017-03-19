@@ -13,7 +13,8 @@ class MainController extends Common{
      * [$results description]
      * @var [type]
      */
-    private $results;
+     private $results;
+     private $results2;
 
     /**
      * [$module description]
@@ -50,6 +51,7 @@ class MainController extends Common{
     {
         $obj = new ShearWallAnalysis();
         $obj->run();
+        $this->results2 = $obj->getResults();
     }
 
     /**

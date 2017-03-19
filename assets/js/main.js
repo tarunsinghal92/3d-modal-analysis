@@ -52,6 +52,74 @@ function clear(context, color) {
     context.clearRect(-1000, 0, canvas.width, canvas.height);
 }
 
+function draw_analysis2(data) {
+
+    // setup canvas
+    canvas = document.getElementById('myCanvas');
+    context = canvas.getContext('2d');
+    canvasData = data;
+    console.log(data);
+    context.save();
+    context.translate(600, 600);
+    context.scale(1, -1);
+
+    //get canvas element
+    for (var fx in canvasData.elements) {
+        for (var fy in canvasData.elements[fx]) {
+            line = canvasData.elements[fx][fy];
+            fillin(context, line, 50 + 2 * data.stresses[fx][fy][1]);
+            draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], 0.5); //crack
+            draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
+            draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
+            draw_line2(context, line[2][0], line[2][1], line[3][0], line[3][1], 0.8);
+            draw_line2(context, line[3][0], line[3][1], line[0][0], line[0][1], 0.8);
+        }
+    }
+
+}
+
+function fillin(context, line, number) {
+    // number = number * 100000;
+    if (number < 50) {
+        // green to yellow
+        r = Math.floor(255 * (number / 50));
+        g = 255;
+
+    } else {
+        // yellow to red
+        r = 255;
+        g = Math.floor(255 * ((50 - number % 50) / 50));
+    }
+    b = 0;
+    context.beginPath();
+    context.moveTo(line[0][0], line[0][1]);
+    context.lineTo(line[1][0], line[1][1]);
+    context.lineTo(line[2][0], line[2][1]);
+    context.lineTo(line[3][0], line[3][1]);
+    context.closePath();
+    context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+    context.fill();
+}
+
+function draw_line3(context, posx1, posy1, posx2, posy2, alpha) {
+    context.beginPath();
+    context.moveTo(posx1, posy1);
+    context.lineTo(posx2, posy2);
+    context.globalAlpha = alpha;
+    context.lineWidth = 2;
+    context.stroke();
+}
+
+
+function draw_line2(context, posx1, posy1, posx2, posy2, alpha) {
+    context.beginPath();
+    context.moveTo(posx1, posy1);
+    context.lineTo(posx2, posy2);
+    context.globalAlpha = alpha;
+    context.lineWidth = 3;
+    context.stroke();
+}
+
 function draw_analysis(step) {
 
     //clear canvas

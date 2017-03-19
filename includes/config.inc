@@ -10,12 +10,12 @@ define('SITEURL', '3d-modal-analysis/');
 /**
  * magnifying factor
  */
-define('OVERALL_MAG', 30);
+define('OVERALL_MAG', 100.0);
 
 /**
  * magnifying factor
  */
-define('DISP_MAG', 200);
+define('DISP_MAG', 100.0);
 
 /**
  * DEBUG MODE

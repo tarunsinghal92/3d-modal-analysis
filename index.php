@@ -36,7 +36,7 @@
         // call the tempate
         $main = new MainController($module);
         $main->run_shear_analysis();
-        // $main->show_template();
+        $main->show_template();
     });
 
     // setup route: /
