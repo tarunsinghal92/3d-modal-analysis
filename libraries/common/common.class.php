@@ -76,6 +76,20 @@ class Common{
     return NULL;
   }
 
+  function microtime_float()
+  {
+      list($usec, $sec) = explode(" ", microtime());
+      return ((float)$usec + (float)$sec);
+  }
+
+  public function round_off($a, $n)
+  {
+      for ($i=0; $i < count($a); $i++) {
+          $a[$i] = round($a[$i], $n);
+      }
+      return $a;
+  }
+
   public function table($array)
   {
       $array = $array->map(function($x) {
