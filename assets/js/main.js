@@ -45,37 +45,51 @@ function setup_canvas(data) {
     context.save();
     context.translate(600, 600);
     context.scale(1, -1);
-    draw_analysis(0);
 }
 
 function clear(context, color) {
     context.clearRect(-1000, 0, canvas.width, canvas.height);
 }
 
-function draw_analysis2(data) {
 
-    // setup canvas
-    canvas = document.getElementById('myCanvas');
-    context = canvas.getContext('2d');
-    canvasData = data;
-    console.log(data);
-    context.save();
-    context.translate(600, 600);
-    context.scale(1, -1);
+function draw_analysis(step) {
 
-    //get canvas element
-    for (var fx in canvasData.elements) {
-        for (var fy in canvasData.elements[fx]) {
-            line = canvasData.elements[fx][fy];
-            fillin(context, line, 50 + 2 * data.stresses[fx][fy][1]);
-            draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], 0.5); //crack
-            draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
-            draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
-            draw_line2(context, line[2][0], line[2][1], line[3][0], line[3][1], 0.8);
-            draw_line2(context, line[3][0], line[3][1], line[0][0], line[0][1], 0.8);
+    // clear canvas
+    clear(context, '#ffffff');
+
+    // draw base case
+    for (var floor in canvasData.modal.canvas[0].floors) {
+        for (var lineID in canvasData.modal.canvas[0].floors[floor]) {
+            line = canvasData.modal.canvas[0].floors[floor][lineID];
+            draw_line(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.3, false, '');
         }
     }
 
+    // draw shear results
+    for (var floor in canvasData.shear[step]) {
+        for (var fx in canvasData.shear[step][floor].elements) {
+            for (var fy in canvasData.shear[step][floor].elements[fx]) {
+                line = canvasData.shear[step][floor].elements[fx][fy];
+                data = canvasData.shear[step][floor];
+                fillin(context, line, 50 + 2 * data.stresses[fx][fy][1]);
+                if (data.cracks[fx][fy].iscracked == true) {
+                    draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], 0.5); //crack
+                }
+                draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
+                draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
+                draw_line2(context, line[2][0], line[2][1], line[3][0], line[3][1], 0.8);
+                draw_line2(context, line[3][0], line[3][1], line[0][0], line[0][1], 0.8);
+            }
+        }
+    }
+
+    // draw modified columns
+    for (var floor in canvasData.modal.canvas[step].floors) {
+        for (var lineID in canvasData.modal.canvas[step].floors[floor]) {
+            line = canvasData.modal.canvas[step].floors[floor][lineID];
+            draw_line(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8, false, '');
+        }
+    }
 }
 
 function fillin(context, line, number) {
@@ -106,7 +120,7 @@ function draw_line3(context, posx1, posy1, posx2, posy2, alpha) {
     context.moveTo(posx1, posy1);
     context.lineTo(posx2, posy2);
     context.globalAlpha = alpha;
-    context.lineWidth = 2;
+    context.lineWidth = 0.5;
     context.stroke();
 }
 
@@ -116,32 +130,9 @@ function draw_line2(context, posx1, posy1, posx2, posy2, alpha) {
     context.moveTo(posx1, posy1);
     context.lineTo(posx2, posy2);
     context.globalAlpha = alpha;
-    context.lineWidth = 3;
+    context.lineWidth = 1;
     context.stroke();
 }
-
-function draw_analysis(step) {
-
-    //clear canvas
-    clear(context, '#ffffff');
-
-    //get canvas element
-    for (var floor in canvasData[0].floors) {
-        for (var lineID in canvasData[0].floors[floor]) {
-            line = canvasData[0].floors[floor][lineID];
-            draw_line(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.3, false, '');
-        }
-    }
-
-    for (var floor in canvasData[step].floors) {
-        for (var lineID in canvasData[step].floors[floor]) {
-            line = canvasData[step].floors[floor][lineID];
-            draw_line(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8, false, '');
-        }
-    }
-
-}
-
 
 function draw_line(context, posx1, posy1, posx2, posy2, alpha, type, ele) {
     context.beginPath();

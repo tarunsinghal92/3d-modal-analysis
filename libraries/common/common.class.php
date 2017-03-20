@@ -49,7 +49,18 @@ class Common{
           echo "<pre>";
           print_r($data);
           echo "</pre>";
+          ob_flush();flush();
       }
+  }
+
+
+  public function store_results_in_file($data, $fname)
+  {
+      $json = json_encode($data);
+      $time = time();
+      $file = fopen($fname,'w+');
+      fwrite($file, $json);
+      fclose($file);
   }
 
   /**

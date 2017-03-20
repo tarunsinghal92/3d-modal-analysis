@@ -25,7 +25,7 @@ class ShearWallAnalysis extends Common
     private $fyx = 430; //Mpa
     private $length = ['a' => 6, 'b' => 3]; // in meters (x,y)
     private $t = 0.10; // thickness meters
-    private $num_elements = 25; // in each direction so 10*10 elements in total
+    private $num_elements = 8; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
     private $ele_k_mat = [];
     private $global_k_mat;
@@ -37,13 +37,16 @@ class ShearWallAnalysis extends Common
     private $old_global_k_mat = [];
     private $final_stress = [];
     private $final_strain = [];
+    private $given_disp = []; // [lower, upper]
+    private $floor_id;
 
 
-    public function __construct()
+    public function __construct($given_disp, $floor_id)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
-
+        $this->given_disp = $given_disp;
+        $this->floor_id = $floor_id;
     }
 
     public function run()
@@ -67,7 +70,6 @@ class ShearWallAnalysis extends Common
 
             // check converge$this
             $this->check_convergence($this->old_global_k_mat, $i);
-            ob_flush();flush();
         }
 
         // calculate material stress and strains
@@ -85,6 +87,7 @@ class ShearWallAnalysis extends Common
     public function getResults()
     {
         $elements = [];
+        $f_s = $this->sign($this->floor_id);
         $tn = ($this->num_elements + 1) * ($this->num_elements + 1);
         $x_size = $this->length['a'] / $this->num_elements;
         $y_size = $this->length['b'] / $this->num_elements;
@@ -92,10 +95,10 @@ class ShearWallAnalysis extends Common
         for ($i = 0; $i < $this->num_elements; $i++) {
             for ($j = 0; $j < $this->num_elements; $j++) {
                 $list = $this->get_dof_list($this->connectivity_list[$i][$j]);
-                $elements[$i][$j][] = [OVERALL_MAG * ($disp[$list[0]] * DISP_MAG + ($x_size * ($i + 0))) , OVERALL_MAG * ($disp[$list[0] + $tn] * DISP_MAG + ($y_size * ($j + 0)))];
-                $elements[$i][$j][] = [OVERALL_MAG * ($disp[$list[1]] * DISP_MAG + ($x_size * ($i + 1))) , OVERALL_MAG * ($disp[$list[1] + $tn] * DISP_MAG + ($y_size * ($j + 0)))];
-                $elements[$i][$j][] = [OVERALL_MAG * ($disp[$list[2]] * DISP_MAG + ($x_size * ($i + 1))) , OVERALL_MAG * ($disp[$list[2] + $tn] * DISP_MAG + ($y_size * ($j + 1)))];
-                $elements[$i][$j][] = [OVERALL_MAG * ($disp[$list[3]] * DISP_MAG + ($x_size * ($i + 0))) , OVERALL_MAG * ($disp[$list[3] + $tn] * DISP_MAG + ($y_size * ($j + 1)))];
+                $elements[$i][$j][] = [OVERALL_MAG * (($f_s * $this->given_disp[0] + $disp[$list[0]]) * DISP_MAG + ($x_size * ($i + 0))) , OVERALL_MAG * ($disp[$list[0] + $tn] * DISP_MAG + ($this->length['b'] * $this->floor_id + $y_size * ($j + 0)))];
+                $elements[$i][$j][] = [OVERALL_MAG * (($f_s * $this->given_disp[0] + $disp[$list[1]]) * DISP_MAG + ($x_size * ($i + 1))) , OVERALL_MAG * ($disp[$list[1] + $tn] * DISP_MAG + ($this->length['b'] * $this->floor_id + $y_size * ($j + 0)))];
+                $elements[$i][$j][] = [OVERALL_MAG * (($f_s * $this->given_disp[0] + $disp[$list[2]]) * DISP_MAG + ($x_size * ($i + 1))) , OVERALL_MAG * ($disp[$list[2] + $tn] * DISP_MAG + ($this->length['b'] * $this->floor_id + $y_size * ($j + 1)))];
+                $elements[$i][$j][] = [OVERALL_MAG * (($f_s * $this->given_disp[0] + $disp[$list[3]]) * DISP_MAG + ($x_size * ($i + 0))) , OVERALL_MAG * ($disp[$list[3] + $tn] * DISP_MAG + ($this->length['b'] * $this->floor_id + $y_size * ($j + 1)))];
             }
         }
 
@@ -107,9 +110,10 @@ class ShearWallAnalysis extends Common
                 $length = OVERALL_MAG * 0.5 * $y_size;
                 $angle = $this->final_cracks[$i][$j];
                 $this->final_cracks[$i][$j] = [
-                  'theta'  => rad2deg($angle),
-                  'pos1'   => [($centerx + $length * cos($angle)) , ($centery + $length * sin($angle))],
-                  'pos2'   => [($centerx + $length * cos(pi() + $angle)) , ($centery + $length * sin(pi() + $angle))],
+                  'iscracked'  => (intval(abs(rad2deg($angle))) == 0 ? false : true),
+                  'theta'      => rad2deg($angle),
+                  'pos1'       => [($centerx + $length * cos($angle)) , ($centery + $length * sin($angle))],
+                  'pos2'       => [($centerx + $length * cos(pi() + $angle)) , ($centery + $length * sin(pi() + $angle))],
                 ];
             }
         }
@@ -123,20 +127,7 @@ class ShearWallAnalysis extends Common
           'strains' => $this->final_strain
         ];
 
-        // store results in file
-        $this->store_results_in_file($res, 1, 1);
-
         return $res;
-    }
-
-    public function store_results_in_file($data, $step, $floor)
-    {
-        $json = json_encode($data);
-        $time = time();
-        $fname = "results/res_[step=$step][floor=$floor][time=$time].json";
-        $file = fopen($fname,'w+');
-        fwrite($file, $json);
-        fclose($file);
     }
 
     public function cal_final_stress_strain()
@@ -264,7 +255,7 @@ class ShearWallAnalysis extends Common
     public function get_displacements()
     {
         // empty array
-        $given_disp = 0.005;
+        $given_disp = $this->given_disp;
         $ls = 1;
         $rs = 1;
         $nx = (1 + $this->num_elements);
@@ -283,22 +274,22 @@ class ShearWallAnalysis extends Common
 
             // set upper one to 0.1 i.e. some disp {only x}
             if(($nx * ($nx - 1)) <= $i && $i < ($nx * $nx)){
-                $disp[$i] = $given_disp;
+                $disp[$i] = $given_disp[1] - $given_disp[0];
                 // set upper one to 0 i.e. roller case disp {only y}
                 $disp[$i + $tnodes] = 0;
             }
 
             // set left side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
             if(($nx * $ls) == $i && $i < $tnodes){
-                $disp[$i] = (3.0 * $given_disp / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
-                // $disp[$i + $tnodes] = 0; NOPES
+                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
+                // $disp[$i + $tnodes] = 0; // NOPES
                 $ls++;
             }
 
             // set right side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
             if(($nx * ($rs + 1) - 1) == $i && $i < $tnodes){
-                $disp[$i] = (3.0 * $given_disp / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
-                // $disp[$i + $tnodes] = 0; NOPES
+                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
+                // $disp[$i + $tnodes] = 0; // NOPES
                 $rs++;
             }
         }
@@ -391,6 +382,11 @@ class ShearWallAnalysis extends Common
                 $theta = 0.5 * atan($Yxy / ($ex - $ey)); // in radians @ check this
             }else{
                 $theta = 0.5 * deg2rad($this->sign($Yxy) * 90);
+            }
+            if($this->sign($theta) == -1){
+                $theta = deg2rad(180) - (deg2rad(90) + $theta);
+            }else{
+                $theta = deg2rad(180) - (deg2rad(90) - $theta);
             }
             $strains = new Vector([$ex, $ey, $Yxy]);
             $stress = $this->ele_d_mat[$i][$j]->multiply($strains)->getColumn(0);

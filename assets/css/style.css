@@ -31,6 +31,13 @@ Topbar
 
 -------------------------------- */
 
+#slider {
+    position: fixed;
+    width: 80%;
+    margin: 20px 10%;
+    top: 0;
+}
+
 .topbar {
     position: fixed;
     z-index: 5;

@@ -13,12 +13,19 @@
     });
 
     // result route: /
-    $router->get('/(results)', function ($module) {
+    $router->get('/(analysis)', function ($module) {
 
         // call the tempate
         $main = new MainController($module);
-        $main->run_analysis();
-        $main->show_template();
+        $main->run();
+    });
+
+    // postprocess route: /
+    $router->get('/(postprocess)', function ($module) {
+
+        // call the tempate
+        $main = new MainController($module);
+        $main->view_results(); 
     });
 
     // setup route: /

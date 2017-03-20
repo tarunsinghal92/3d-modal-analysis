@@ -14,6 +14,7 @@ class MainController extends Common{
      * @var [type]
      */
      private $results;
+     private $final_results;
      private $results2;
 
     /**
@@ -30,6 +31,16 @@ class MainController extends Common{
 
         //define var
         $this->module = $module;
+    }
+
+    /**
+     * [run_analysis description]
+     * @return boolean [description]
+     */
+    public function run()
+    {
+        $obj = new CombinedAnalysis();
+        $this->final_results = $obj->getResults();
     }
 
     /**
@@ -68,6 +79,16 @@ class MainController extends Common{
 
         //include footer
         require_once 'views/footer.phtml';
+    }
+
+    public function view_results()
+    {
+        // fetch data from files
+        $obj = new CombinedAnalysis();
+        $this->final_results = $obj->fetchResultsFromFiles(5397);
+
+        // show everthing in template
+        $this->show_template();
     }
 }
 

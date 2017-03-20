@@ -7,17 +7,13 @@
  *  0. Newmark Implement Done!!!
  *  1. convert 2d to 3d (NOPES)
  *  2. add shearwalls
- *  3. interpolation function to get shear wall stresses
+ *  3. interpolation function to get shear wall stresses done!!!
  *  4. UI
  *  5. Time step variation done!!!
- *  6. Non-linear Analysis (only for shearwall)
+ *  6. Non-linear Analysis done!!!
  *  7. Discuss whatever you have Done!!!
  *  8. Report/PPT/Flyer
  *
- * @Question
- *  1. how to consider deflection in column (linear / nonlinear) ??? Not Clear
- *  2. Shear wall analysis (interpolation / MCFT) YES
- *  3. Is it fine without 3d? OK
  *
  * @author Tarun K. Singhal <tarun.singhal@mail.utoronto.ca>
  *
@@ -38,24 +34,24 @@ class ModalAnalysis extends Common
     private $modalMatrix;
     private $eqData;
     private $results;
-    private $numFloors = 5;
+    private $numFloors = 3;
     private $wallThickness = 0.1; // m
     private $massFloor = 407; //kg
     private $floorWidth = 6; //m
     private $youngModulusMultI = 60000;  // KN m2
     private $heightColumn = 3; // in m
     private $damping = 0.05; // 5% in 1st and N-1th floors
-    private $eqFile = 'data/el-centro.dat';
+    private $eqFile;
     private $timeStep = 0.02; //sec means half of 0.2 ie 0.1
-    private $analysisLength = 5.0; //sec
+    private $analysisLength = 1.0; //sec
     private $newMarkCons = [
       'alpha' => 0.5,
       'beta'  => 0.25
     ];
 
-    public function __construct()
+    public function __construct($eq)
     {
-
+        $this->eqFile = $eq;
     }
 
     public function run()
@@ -75,6 +71,7 @@ class ModalAnalysis extends Common
         //results
         $this->makePlotData();
         $this->makeCanvasData();
+
     }
 
     public function makeCanvasData()

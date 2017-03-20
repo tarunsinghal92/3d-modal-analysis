@@ -1,0 +1,38 @@
+
+<script>
+    console.log(JSON.parse('<?php echo json_encode($this->final_results); ?>'));
+</script>
+
+<div id="slider"></div>
+<canvas id="myCanvas" width="2000" height="1000"></canvas>
+<div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+<script>
+
+    // plot graph
+    var legend = JSON.parse('<?php echo json_encode($this->final_results['modal']['plot']['legends']); ?>');
+    var data = JSON.parse('<?php echo json_encode($this->final_results['modal']['plot']['data']); ?>');
+    draw_plot('container', legend, data);
+
+    // setup canvas
+    setup_canvas(JSON.parse('<?php echo json_encode($this->final_results); ?>'))
+
+    // manipulate slider
+    $( "#slider" ).slider({
+        step: 1,
+        min: 0,
+        max: <?php echo count($this->final_results['modal']['plot']['legends']) ?>,
+        change: function( event, ui ) {
+            draw_analysis(ui.value);
+        },
+        slide: function( event, ui ) {
+            draw_analysis(ui.value);
+        }
+    });
+    // setInterval(function(){
+    //     old = $('#slider').slider( "option", "value");
+    //     if(old > 500){
+    //         old = 0;
+    //     }
+    //     $('#slider').slider("value",old + 1);
+    // }, 50);
+</script>
