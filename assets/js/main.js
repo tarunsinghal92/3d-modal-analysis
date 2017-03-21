@@ -56,22 +56,22 @@ function change_result(obj) {
 
     switch (type) {
         case 'ex':
-            result_type = ['stresses', 0];
-            break;
-        case 'ey':
-            result_type = ['stresses', 1];
-            break;
-        case 'Yxy':
-            result_type = ['stresses', 2];
-            break;
-        case 'fx':
             result_type = ['strains', 0];
             break;
-        case 'fy':
+        case 'ey':
             result_type = ['strains', 1];
             break;
-        case 'Txy':
+        case 'Yxy':
             result_type = ['strains', 2];
+            break;
+        case 'fx':
+            result_type = ['stresses', 0];
+            break;
+        case 'fy':
+            result_type = ['stresses', 1];
+            break;
+        case 'Txy':
+            result_type = ['stresses', 2];
             break;
         default:
             result_type = ['stresses', 0];
@@ -79,7 +79,7 @@ function change_result(obj) {
     draw_analysis($('#slider').slider("option", "value"));
 }
 
-var result_type = ['stresses', 0];
+var result_type = ['strains', 2];
 
 function draw_analysis(step) {
 
@@ -103,7 +103,7 @@ function draw_analysis(step) {
                 if (result_type[0] == 'stresses') {
                     fillinstress(context, line, 50 + 2 * data[result_type[0]][fx][fy][result_type[1]]);
                 } else {
-                    fillinstrain(context, line, 50 + 2 * data[result_type[0]][fx][fy][result_type[1]]);
+                    fillinstrain(context, line, Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
                 }
                 if (data.cracks[fx][fy].iscracked == true) {
                     draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].width); //crack
@@ -139,6 +139,7 @@ function draw_analysis(step) {
 
 function fillinstrain(context, line, number) {
     number = number * 100000;
+    console.log(number);
     if (number < 50) {
         // green to yellow
         r = Math.floor(255 * (number / 50));
@@ -189,6 +190,7 @@ function draw_line3(context, posx1, posy1, posx2, posy2, width) {
     context.lineTo(posx2, posy2);
     context.globalAlpha = 0.8;
     context.lineWidth = Math.min(width, 5); // change to it actual width @todo
+    context.lineWidth = .5; // change to it actual width @todo
     context.stroke();
 }
 

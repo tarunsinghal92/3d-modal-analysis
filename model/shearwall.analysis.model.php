@@ -25,11 +25,13 @@ class ShearWallAnalysis extends Common
     private $fyx = 430; //Mpa
     private $length = ['a' => 6.0, 'b' => 3.0]; // in meters (x,y)
     public  $t = 0.10; // thickness meters
-    private $num_elements = 10.0; // in each direction so 10*10 elements in total
+    private $num_elements = 6.0; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
+    private $ele_dc_mat = [];
+    private $ele_ds_mat = [];
     private $ele_k_mat = [];
     private $global_k_mat;
-    private $num_iterations = 20;
+    private $num_iterations = 5;
     private $connectivity_list = [];
     private $displacements = [];
     private $forces = [];
@@ -44,14 +46,14 @@ class ShearWallAnalysis extends Common
     private $iscracked = [];
 
 
-    public function __construct($given_disp = [0, -0.005], $floor_id = 0)
+    public function __construct($given_disp = [0, 0.01], $floor_id = 0)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
         $this->given_disp = $given_disp;
         $this->floor_id = $floor_id;
         $this->displacements = array_fill(0, $dofs, 0);
-        $this->iscracked = $this->initialize_matrix($dofs);
+        $this->iscracked = $this->initialize_matrix($this->num_elements);
 
         for ($i = 0; $i < $this->num_elements; $i++) {
             for ($j = 0; $j < $this->num_elements; $j++) {
@@ -102,6 +104,7 @@ class ShearWallAnalysis extends Common
             // $this->dump($this->final_stress, true);
             // $this->dump($this->final_strain, true);
         }
+        // $this->dump($this->ele_dc_mat, true);
         // die;
     }
 
@@ -189,16 +192,6 @@ class ShearWallAnalysis extends Common
        $this->final_cracks = $cracks;
     }
 
-    public function check_convergence2($old, $iteration)
-    {
-        $sum = 0;
-        if(count($old) == 0) $old = array_fill(0, count($this->displacements), $this->SNUM);
-        foreach ($this->displacements as $key => $d) {
-            $sum += (($d - $old[$key]) / $old[$key])**2;
-        }
-        $this->dump('iteration: [' . $iteration . ' => ' . ($sum / count($this->displacements)) . ']', true);
-    }
-
     public function check_convergence($old, $iteration)
     {
         $diff = $old->subtract($this->global_k_mat)->map(function($x) {
@@ -210,7 +203,7 @@ class ShearWallAnalysis extends Common
         for ($i=0; $i < count($diff); $i++) {
             $sum += array_sum($diff[$i]);
         }
-        $this->dump('iteration: [' . $iteration . ' => ' . ($sum / $total) . ']', true);
+        $this->dump('iteration: [' . $iteration . ' => ' . ($sum / $total) . ']', false);
     }
 
     public function get_forces()
@@ -229,7 +222,6 @@ class ShearWallAnalysis extends Common
 
     public function solve_matrix()
     {
-
         // get variables
         $removelist = [];
         $cnt = 0;
@@ -426,9 +418,6 @@ class ShearWallAnalysis extends Common
 
     public function getElementWiseMeterialStiffness($iteration, $i, $j)
     {
-
-
-
         // modifiy value
         $this->iscracked[$i][$j] = $this->check_if_cracked($this->iscracked[$i][$j], $i, $j);
 
@@ -443,6 +432,7 @@ class ShearWallAnalysis extends Common
             $c[0][1] = $this->nu;
             $c[2][2] = (1 - $this->nu) / 2;
             $c = MatrixFactory::create($c);
+            $this->ele_dc_mat[$i][$j] = $c;
             $c = $c->scalarMultiply($this->Ec / (1 - ($this->nu * $this->nu)));
             $matrix = $c;
 
@@ -479,52 +469,62 @@ class ShearWallAnalysis extends Common
             $fc1_star += 0.01 * $this->rho_y * ($this->fyx - $fsy) * cos($theta - PI()/2)**2;
             $fc1 = min($fc1, $fc1_star);
 
+            // do non linear analysis
+            $fc2 = $this->get_fc2($ec1, $ec2);
 
-            if(abs($fc1) >= $this->ft_dash || true){
+            $fs1 = min(($this->Es * $es1), $this->fyx);
+            $fs2 = min(($this->Es * $es2), $this->fyx);
+            $Es2 = ($es2 == 0) ? $this->Es : min($this->Es, $fs2/$es2);
+            $Es1 = ($es1 == 0) ? $this->Es : min($this->Es, $fs1/$es1);
 
-                // do non linear analysis
-                $beta = min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0);
-                $ep = $beta * $this->ec_dash;
-                $fp = $beta * $this->fc_dash;
-                if(0 < $ec2 && $ec2 < $ep){
-                    $fc2 = -$fp * (2 * ($ec2 / $ep) - ($ec2 / $ep)**2);
-                }else if($ep < $ec2 && $ec2 < $this->ec_dash){
-                    $fc2 = -$fp;
-                }else{
-                    $fc2 = -$fp * (2 * ($ec2 / $this->ec_dash) - ($ec2 / $this->ec_dash)**2);
-                }
-                $fs1 = min(($this->Es * $es1), $this->fyx);
-                $fs2 = min(($this->Es * $es2), $this->fyx);
-                $Es2 = ($es2 == 0) ? $this->Es : min($this->Es, $fs2/$es2);
-                $Es1 = ($es1 == 0) ? $this->Es : min($this->Es, $fs1/$es1);
+            // for concrete
+            $c = $this->initialize_matrix(3);
+            $c[0][0] = $fc1 / $ec1;
+            $c[1][1] = $fc2 / $ec2;
+            $c[2][2] = ($c[1][1] * $c[0][0]) / ($c[1][1] + $c[0][0]);
+            $c = MatrixFactory::create($c);
+            $this->ele_dc_mat[$i][$j] = $c;
+            $c = $this->transform($c, $theta);
 
-                // for concrete
-                $c = $this->initialize_matrix(3);
-                $c[0][0] = $fc1 / $ec1;
-                $c[1][1] = $fc2 / $ec2;
-                $c[2][2] = ($c[1][1] * $c[0][0]) / ($c[1][1] + $c[0][0]);
-                $c = MatrixFactory::create($c);
-                $c = $this->transform($c, $theta);
+            // for reinf - x
+            $rx = $this->initialize_matrix(3);
+            $rx[0][0] = $this->rho_x * $Es1 / 100;
+            $rx = MatrixFactory::create($rx);
+            $rx = $this->transform($rx, 0);
 
-                // for reinf - x
-                $rx = $this->initialize_matrix(3);
-                $rx[0][0] = $this->rho_x * $Es1 / 100;
-                $rx = MatrixFactory::create($rx);
-                $rx = $this->transform($rx, 0);
+            // for reinf - y
+            $ry = $this->initialize_matrix(3);
+            $ry[0][0] = $this->rho_y * $Es2 / 100;
+            $ry = MatrixFactory::create($ry);
+            $ry = $this->transform($ry, PI()/2);
 
-                // for reinf - y
-                $ry = $this->initialize_matrix(3);
-                $ry[0][0] = $this->rho_y * $Es2 / 100;
-                $ry = MatrixFactory::create($ry);
-                $ry = $this->transform($ry, PI()/2);
-
-                // add all
-                $matrix = $c->add($rx)->add($ry);
-            }
+            // add all
+            $matrix = $c->add($rx)->add($ry);
         }
+
+        // store dc and dsi
+        $this->ele_ds_mat[$i][$j] = $rx->add($ry);
 
         // return
         return $matrix;
+    }
+
+    public function get_fc2($ec1, $ec2)
+    {
+        $fc2 = 0;
+        $beta = min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0);
+        $ep = $beta * $this->ec_dash;
+        $fp = $beta * $this->fc_dash;
+
+        if(0 < $ec2 && $ec2 < $ep){
+            // echo "yes => [$ec1][$ec2][$beta]<br>";
+            $fc2 = -$fp * (2 * ($ec2 / $ep) - ($ec2 / $ep)**2);
+        }else if($ep < $ec2 && $ec2 < $this->ec_dash){
+            $fc2 = -$fp;
+        }else{
+            $fc2 = -$fp * (2 * ($ec2 / $this->ec_dash) - ($ec2 / $this->ec_dash)**2);
+        }
+        return $fc2;
     }
 
     // theta used in transformation matrix

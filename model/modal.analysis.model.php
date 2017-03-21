@@ -325,16 +325,14 @@ class ModalAnalysis extends Common
          * @Assumption:
          *  1. Columns & shearwalls contribute only to stiffness
          *  2. Beams have infinite stiffness
-         *  @TODO add shearwall stiffness
-         *  K = 12EI/h3
+         *  K = 24EI/h3
          */
 
         //floor stiffness
-        $k = 12 * $this->youngModulusMultI / ($this->heightColumn * $this->heightColumn * $this->heightColumn);
+        $k = 24 * $this->youngModulusMultI / ($this->heightColumn * $this->heightColumn * $this->heightColumn);
 
-        //shearwall stuffness @http://ef.engr.utk.edu/ce576-2014-01/notes/Shear-Walls.pdf
-        $r = $this->heightColumn / $this->floorWidth;
-        $k += (ShearWallAnalysis::Ec * ShearWallAnalysis::$t) / ($r * ($r**2 + 3));
+        //shearwall stuffness [from EQ ppt]
+        $k += 3 * $this->youngModulusMultI / ($this->heightColumn**3 * (1+ 0.6*(1+0.3)*($this->floorWidth / $this->heightColumn)**2));
 
         //2DOF stiffness
         $stiffness2DOF = [
