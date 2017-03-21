@@ -1,11 +1,31 @@
 
 <script>
-    console.log(JSON.parse('<?php echo json_encode($this->final_results); ?>'));
+    // console.log(JSON.parse('<?php echo json_encode($this->final_results); ?>'));
 </script>
 
+<style>
+  .btn_container {
+    position: fixed;
+    right: 150px;
+    top: 150px;
+  }
+  .btn_container button{
+    width: 80px;
+    margin: 5px;
+    height: 30px;
+    font-size: 13px;}
+</style>
 <div id="slider"></div>
 <canvas id="myCanvas" width="2000" height="1000"></canvas>
 <div id="container" style="min-width: 310px; height: 400px; margin: 0 auto"></div>
+<div class="btn_container">
+    <button id="ex" onclick="change_result(this)" type="button">&epsilon;<sub>x</sub></button><br>
+    <button id="ey" onclick="change_result(this)" type="button">&epsilon;<sub>y</sub></button><br>
+    <button id="Yxy" onclick="change_result(this)" type="button">&gamma;<sub>xy</sub></button><br>
+    <button id="fx" onclick="change_result(this)" type="button">&sigma;<sub>x</sub></button><br>
+    <button id="fy" onclick="change_result(this)" type="button">&sigma;<sub>y</sub></button><br>
+    <button id="Txy" onclick="change_result(this)" type="button">&tau;<sub>xy</sub></button>
+</div>
 <script>
 
     // plot graph
@@ -28,11 +48,11 @@
             draw_analysis(ui.value);
         }
     });
-    // setInterval(function(){
-    //     old = $('#slider').slider( "option", "value");
-    //     if(old > 500){
-    //         old = 0;
-    //     }
-    //     $('#slider').slider("value",old + 1);
-    // }, 50);
+    setInterval(function(){
+        old = $('#slider').slider( "option", "value");
+        if(old > 200){
+            old = 0;
+        }
+        $('#slider').slider("value",old + 1);
+    }, 60);
 </script>

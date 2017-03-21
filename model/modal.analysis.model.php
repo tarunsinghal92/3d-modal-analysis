@@ -36,7 +36,7 @@ class ModalAnalysis extends Common
     private $results;
     private $numFloors = 3;
     private $wallThickness = 0.1; // m
-    private $massFloor = 407; //kg
+    private $massFloor = 3000; //kg
     private $floorWidth = 6; //m
     private $youngModulusMultI = 60000;  // KN m2
     private $heightColumn = 3; // in m
@@ -333,7 +333,8 @@ class ModalAnalysis extends Common
         $k = 12 * $this->youngModulusMultI / ($this->heightColumn * $this->heightColumn * $this->heightColumn);
 
         //shearwall stuffness @http://ef.engr.utk.edu/ce576-2014-01/notes/Shear-Walls.pdf
-        // $k = ;
+        $r = $this->heightColumn / $this->floorWidth;
+        $k += (ShearWallAnalysis::Ec * ShearWallAnalysis::$t) / ($r * ($r**2 + 3));
 
         //2DOF stiffness
         $stiffness2DOF = [

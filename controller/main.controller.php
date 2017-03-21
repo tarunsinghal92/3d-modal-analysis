@@ -85,7 +85,7 @@ class MainController extends Common{
     {
         // fetch data from files
         $obj = new CombinedAnalysis();
-        $this->final_results = $obj->fetchResultsFromFiles(5397);
+        $this->final_results = $obj->fetchResultsFromFiles(48490);
 
         // show everthing in template
         $this->show_template();

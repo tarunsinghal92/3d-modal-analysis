@@ -16,20 +16,20 @@ class ShearWallAnalysis extends Common
 
     private $fc_dash = 21.8; // MPa
     private $ft_dash = 1.54; // MPa
-    private $ec_dash = -1.80e-3; // dimensionless
+    private $ec_dash = -0.0018; // dimensionless
     private $rho_x = 1; // %
     private $rho_y = 1; // %
-    private $Ec = 24200; // MPa
+    public  $Ec = 24200; // MPa
     private $Es = 200000; // Mpa
     private $nu = 0.30; // Mpa
     private $fyx = 430; //Mpa
-    private $length = ['a' => 6, 'b' => 3]; // in meters (x,y)
-    private $t = 0.10; // thickness meters
-    private $num_elements = 8; // in each direction so 10*10 elements in total
+    private $length = ['a' => 6.0, 'b' => 3.0]; // in meters (x,y)
+    public  $t = 0.10; // thickness meters
+    private $num_elements = 10.0; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
     private $ele_k_mat = [];
     private $global_k_mat;
-    private $num_iterations = 6;
+    private $num_iterations = 20;
     private $connectivity_list = [];
     private $displacements = [];
     private $forces = [];
@@ -39,14 +39,32 @@ class ShearWallAnalysis extends Common
     private $final_strain = [];
     private $given_disp = []; // [lower, upper]
     private $floor_id;
+    private $Sm = 50.0; //mm Smx, Smy pg 93
+    private $SNUM = 10**-9;
+    private $iscracked = [];
 
 
-    public function __construct($given_disp, $floor_id)
+    public function __construct($given_disp = [0, -0.005], $floor_id = 0)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
         $this->given_disp = $given_disp;
         $this->floor_id = $floor_id;
+        $this->displacements = array_fill(0, $dofs, 0);
+        $this->iscracked = $this->initialize_matrix($dofs);
+
+        for ($i = 0; $i < $this->num_elements; $i++) {
+            for ($j = 0; $j < $this->num_elements; $j++) {
+
+                // store connectivity CCW
+                $this->connectivity_list[$i][$j] = [
+                    (($this->num_elements + 1) * $j + $i),
+                    (($this->num_elements + 1) * $j + $i + 1),
+                    (($this->num_elements + 1) * ($j + 1) + $i + 1),
+                    (($this->num_elements + 1) * ($j + 1) + $i)
+                ];
+            }
+        }
     }
 
     public function run()
@@ -77,11 +95,14 @@ class ShearWallAnalysis extends Common
 
         if(DEBUG){
             // $this->table($this->global_k_mat);
-            // $this->dump($this->forces);
-            // $this->dump($this->displacements);
-            // $this->dump($this->final_stress);
-            // $this->dump($this->final_strain);
+            // $this->dump($this->forces, true);
+            // $this->dump($this->ele_d_mat, true);
+            // $this->dump($this->final_strain, true);
+            // $this->dump($this->displacements, true);
+            // $this->dump($this->final_stress, true);
+            // $this->dump($this->final_strain, true);
         }
+        // die;
     }
 
     public function getResults()
@@ -103,15 +124,21 @@ class ShearWallAnalysis extends Common
         }
 
         // add crack lines
+        $tnodes = $tn;
         for ($i = 0; $i < $this->num_elements; $i++) {
             for ($j = 0; $j < $this->num_elements; $j++) {
+
                 $centerx = ($elements[$i][$j][0][0] + $elements[$i][$j][1][0] + $elements[$i][$j][2][0] + $elements[$i][$j][3][0]) / 4;
                 $centery = ($elements[$i][$j][0][1] + $elements[$i][$j][1][1] + $elements[$i][$j][2][1] + $elements[$i][$j][3][1]) / 4;
                 $length = OVERALL_MAG * 0.5 * $y_size;
                 $angle = $this->final_cracks[$i][$j];
+                list($ex, $ey, $Yxy) = $this->get_principle_strains($i, $j);
+                $ec1 = 0.5 * (($ex + $ey) + sqrt(($ex - $ey)**2 + $Yxy**2));
+
                 $this->final_cracks[$i][$j] = [
                   'iscracked'  => (intval(abs(rad2deg($angle))) == 0 ? false : true),
                   'theta'      => rad2deg($angle),
+                  'width'      => ($this->Sm * $ec1 / (cos($angle) + sin($angle))),
                   'pos1'       => [($centerx + $length * cos($angle)) , ($centery + $length * sin($angle))],
                   'pos2'       => [($centerx + $length * cos(pi() + $angle)) , ($centery + $length * sin(pi() + $angle))],
                 ];
@@ -154,17 +181,22 @@ class ShearWallAnalysis extends Common
 
               $stress[$i][$j] = $this->ele_d_mat[$i][$j]->multiply(new Vector([$ex, $ey, $Yxy]))->getColumn(0);
               $strain[$i][$j] = [$ex, $ey, $Yxy];
-
-              if($ey - $ex != 0){
-                  $cracks[$i][$j] = 0.5 * atan($Yxy / ($ex - $ey)); // in radians @ check this
-              }else{
-                  $cracks[$i][$j] = 0.5 * deg2rad($this->sign($Yxy) * 90);
-              }
+              $cracks[$i][$j] = $this->calculate_theta($ex, $ey, $Yxy, true);
           }
        }
        $this->final_stress = $stress;
        $this->final_strain = $strain;
        $this->final_cracks = $cracks;
+    }
+
+    public function check_convergence2($old, $iteration)
+    {
+        $sum = 0;
+        if(count($old) == 0) $old = array_fill(0, count($this->displacements), $this->SNUM);
+        foreach ($this->displacements as $key => $d) {
+            $sum += (($d - $old[$key]) / $old[$key])**2;
+        }
+        $this->dump('iteration: [' . $iteration . ' => ' . ($sum / count($this->displacements)) . ']', true);
     }
 
     public function check_convergence($old, $iteration)
@@ -178,7 +210,7 @@ class ShearWallAnalysis extends Common
         for ($i=0; $i < count($diff); $i++) {
             $sum += array_sum($diff[$i]);
         }
-        // $this->dump('iteration: [' . $iteration . ' => ' . ($sum / $total) . ']');
+        $this->dump('iteration: [' . $iteration . ' => ' . ($sum / $total) . ']', true);
     }
 
     public function get_forces()
@@ -224,7 +256,7 @@ class ShearWallAnalysis extends Common
         // form force matrix
         $this->payne_iron_solver($stiff->getMatrix(), $disp, $forces);
 
-        // debug
+        // store
         $this->displacements = $disp;
         $this->forces = $forces;
 
@@ -281,14 +313,14 @@ class ShearWallAnalysis extends Common
 
             // set left side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
             if(($nx * $ls) == $i && $i < $tnodes){
-                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
+                // $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
                 // $disp[$i + $tnodes] = 0; // NOPES
                 $ls++;
             }
 
             // set right side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
             if(($nx * ($rs + 1) - 1) == $i && $i < $tnodes){
-                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
+                // $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
                 // $disp[$i + $tnodes] = 0; // NOPES
                 $rs++;
             }
@@ -303,21 +335,13 @@ class ShearWallAnalysis extends Common
         // get individual matrices
         $ele_d_mat = [];
         $ele_k_mat = [];
-        $c_list    = [];
+        $c_list    = $this->connectivity_list;
         for ($i = 0; $i < $this->num_elements; $i++) {
             for ($j = 0; $j < $this->num_elements; $j++) {
 
                 // get stiffness
                 $ele_d_mat[$i][$j] = $this->getElementWiseMeterialStiffness($iteration, $i, $j);
                 $ele_k_mat[$i][$j] = $this->getElementWiseGlobalStiffness($ele_d_mat[$i][$j]);
-
-                // store connectivity CCW
-                $c_list[$i][$j] = [
-                    (($this->num_elements + 1) * $j + $i),
-                    (($this->num_elements + 1) * $j + $i + 1),
-                    (($this->num_elements + 1) * ($j + 1) + $i + 1),
-                    (($this->num_elements + 1) * ($j + 1) + $i)
-                ];
             }
         }
 
@@ -340,7 +364,6 @@ class ShearWallAnalysis extends Common
         //store it
         $this->ele_d_mat = $ele_d_mat;
         $this->ele_k_mat = $ele_k_mat;
-        $this->connectivity_list = $c_list;
         $this->global_k_mat = MatrixFactory::create($global_k_mat);
     }
 
@@ -355,49 +378,112 @@ class ShearWallAnalysis extends Common
         return array_merge($u, $v);
     }
 
+    public function get_principle_strains($i, $j)
+    {
+        $clist = $this->connectivity_list[$i][$j];
+        $disp = $this->displacements;
+        $x_size = $this->length['a'] / $this->num_elements;
+        $y_size = $this->length['b'] / $this->num_elements;
+        $tnodes = ($this->num_elements + 1) * ($this->num_elements + 1);
+
+        // calculate ex, ey & Yxy
+        $ex = ($disp[$clist[1]] + $disp[$clist[2]] - $disp[$clist[0]] - $disp[$clist[3]]) / (2 * $x_size);
+        $ey = ($disp[$tnodes + $clist[2]] + $disp[$tnodes + $clist[3]] - $disp[$tnodes + $clist[0]] - $disp[$tnodes + $clist[1]]) / (2 * $y_size);
+        $Yxy = ($disp[$clist[2]] + $disp[$clist[3]] - $disp[$clist[0]] - $disp[$clist[1]]) / (2 * $y_size);
+        $Yxy += ($disp[$tnodes + $clist[1]] + $disp[$tnodes + $clist[2]] - $disp[$tnodes + $clist[0]] - $disp[$tnodes + $clist[3]]) / (2 * $x_size);
+
+        // zero check
+        if(abs($ex) < $this->SNUM)$ex = -$this->SNUM;
+        if(abs($ey) < $this->SNUM)$ey = -$this->SNUM;
+
+        // return
+        return [$ex, $ey, $Yxy];
+    }
+
+    public function check_if_cracked($iscrack, $i, $j)
+    {
+        if($iscrack === 1) {
+            return 1;
+        }else{
+
+            list($ex, $ey, $Yxy) = $this->get_principle_strains($i, $j);
+            $c = $this->initialize_matrix(3);
+            $c[0][0] = 1;
+            $c[1][1] = 1;
+            $c[1][0] = $this->nu;
+            $c[0][1] = $this->nu;
+            $c[2][2] = (1 - $this->nu) / 2;
+            $c = MatrixFactory::create($c);
+            $c = $c->scalarMultiply($this->Ec / (1 - ($this->nu * $this->nu)));
+            $r = $c->multiply(new Vector([$ex, $ey, $Yxy]))->getColumn(0);
+            $fc1 = 0.5 * (($r[0] + $r[1]) + sqrt(($r[0] - $r[1])**2 + 4*($r[2])**2));
+            if(abs($fc1) >= $this->ft_dash){
+                return 1;
+            }
+            return 0;
+        }
+    }
+
     public function getElementWiseMeterialStiffness($iteration, $i, $j)
     {
+
+
+
+        // modifiy value
+        $this->iscracked[$i][$j] = $this->check_if_cracked($this->iscracked[$i][$j], $i, $j);
+
         // check stage type : linear or non linear
-        $islinear = false;
-        if($iteration == 1){
-            $islinear = true;
+        if($this->iscracked[$i][$j] === 0){
+
+            // for concrete
+            $c = $this->initialize_matrix(3);
+            $c[0][0] = 1;
+            $c[1][1] = 1;
+            $c[1][0] = $this->nu;
+            $c[0][1] = $this->nu;
+            $c[2][2] = (1 - $this->nu) / 2;
+            $c = MatrixFactory::create($c);
+            $c = $c->scalarMultiply($this->Ec / (1 - ($this->nu * $this->nu)));
+            $matrix = $c;
+
+            // for reinf - x
+            $rx = $this->initialize_matrix(3);
+            $rx[0][0] = $this->rho_x * $this->Es / 100;
+            $rx = MatrixFactory::create($rx);
+            $rx = $this->transform($rx, 0);
+
+            // for reinf - y
+            $ry = $this->initialize_matrix(3);
+            $ry[0][0] = $this->rho_y * $this->Es / 100;
+            $ry = MatrixFactory::create($ry);
+            $ry = $this->transform($ry, PI()/2);
+
+            // add all
+            $matrix = $c->add($rx)->add($ry);
+
         }else{
+
             // calculate strains
-            $clist = $this->connectivity_list[$i][$j];
-            $disp = $this->displacements;
-            $x_size = $this->length['a'] / $this->num_elements;
-            $y_size = $this->length['b'] / $this->num_elements;
-            $tnodes = ($this->num_elements + 1) * ($this->num_elements + 1);
-
-            $ex = ($disp[$clist[1]] + $disp[$clist[2]] - $disp[$clist[0]] - $disp[$clist[3]]) / (2 * $x_size);
-            $ey = ($disp[$tnodes + $clist[2]] + $disp[$tnodes + $clist[3]] - $disp[$tnodes + $clist[0]] - $disp[$tnodes + $clist[1]]) / (2 * $y_size);
-            $Yxy = ($disp[$clist[2]] + $disp[$clist[3]] - $disp[$clist[0]] - $disp[$clist[1]]) / (2 * $y_size);
-            $Yxy += ($disp[$tnodes + $clist[1]] + $disp[$tnodes + $clist[2]] - $disp[$tnodes + $clist[0]] - $disp[$tnodes + $clist[3]]) / (2 * $x_size);
-
+            list($ex, $ey, $Yxy) = $this->get_principle_strains($i, $j);
             $ec1 = 0.5 * (($ex + $ey) + sqrt(($ex - $ey)**2 + $Yxy**2));
             $ec2 = 0.5 * (($ex + $ey) - sqrt(($ex - $ey)**2 + $Yxy**2));
             $es1 = $ex;
             $es2 = $ey;
-            if($ey - $ex != 0){
-                $theta = 0.5 * atan($Yxy / ($ex - $ey)); // in radians @ check this
-            }else{
-                $theta = 0.5 * deg2rad($this->sign($Yxy) * 90);
-            }
-            if($this->sign($theta) == -1){
-                $theta = deg2rad(180) - (deg2rad(90) + $theta);
-            }else{
-                $theta = deg2rad(180) - (deg2rad(90) - $theta);
-            }
-            $strains = new Vector([$ex, $ey, $Yxy]);
-            $stress = $this->ele_d_mat[$i][$j]->multiply($strains)->getColumn(0);
-            // $this->show($this->ele_d_mat[$i][$j]);
-            // $this->dump($stress);
-            // $this->dump([$ex, $ey, $Yxy]);
-            if($stress[0] >= $this->ft_dash){
+            $theta = $this->calculate_theta($ex, $ey, $Yxy);
 
-                // fc*
-                $fc1 = $this->ft_dash * (1 + sqrt(200 * $ec1));
-                $beta = (0.85 - 0.34 * ($ec1 / $ec2))**-1;
+            // check yeilding across check
+            $fc1 = $this->ft_dash * (1 + sqrt(200 * abs($ec1)));
+            $fsx = min(abs($this->Es * $ex), $this->fyx);
+            $fsy = min(abs($this->Es * $ey), $this->fyx);
+            $fc1_star = 0.01 * $this->rho_x * ($this->fyx - $fsx) * cos($theta - 0)**2;
+            $fc1_star += 0.01 * $this->rho_y * ($this->fyx - $fsy) * cos($theta - PI()/2)**2;
+            $fc1 = min($fc1, $fc1_star);
+
+
+            if(abs($fc1) >= $this->ft_dash || true){
+
+                // do non linear analysis
+                $beta = min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0);
                 $ep = $beta * $this->ec_dash;
                 $fp = $beta * $this->fc_dash;
                 if(0 < $ec2 && $ec2 < $ep){
@@ -409,8 +495,8 @@ class ShearWallAnalysis extends Common
                 }
                 $fs1 = min(($this->Es * $es1), $this->fyx);
                 $fs2 = min(($this->Es * $es2), $this->fyx);
-                $Es2 = ($es2 == 0) ? $this->Es : ($fs2/$es2);
-                $Es1 = ($es1 == 0) ? $this->Es : ($fs1/$es1);
+                $Es2 = ($es2 == 0) ? $this->Es : min($this->Es, $fs2/$es2);
+                $Es1 = ($es1 == 0) ? $this->Es : min($this->Es, $fs1/$es1);
 
                 // for concrete
                 $c = $this->initialize_matrix(3);
@@ -424,38 +510,49 @@ class ShearWallAnalysis extends Common
                 $rx = $this->initialize_matrix(3);
                 $rx[0][0] = $this->rho_x * $Es1 / 100;
                 $rx = MatrixFactory::create($rx);
-                $rx = $this->transform($rx, deg2rad(0));
+                $rx = $this->transform($rx, 0);
 
                 // for reinf - y
                 $ry = $this->initialize_matrix(3);
                 $ry[0][0] = $this->rho_y * $Es2 / 100;
                 $ry = MatrixFactory::create($ry);
-                $ry = $this->transform($ry, deg2rad(90));
+                $ry = $this->transform($ry, PI()/2);
 
                 // add all
                 $matrix = $c->add($rx)->add($ry);
-                $islinear = false;
-            }else{
-                $islinear = true;
             }
-        }
-        // print("($i, $j) => $islinear <br>");
-        // based on above findings
-        if($islinear){
-
-            // initialize matrix
-            $matrix = $this->initialize_matrix(3);
-            $matrix[0][0] = 1;
-            $matrix[1][1] = 1;
-            $matrix[1][0] = $this->nu;
-            $matrix[0][1] = $this->nu;
-            $matrix[2][2] = (1 - $this->nu) / 2;
-            $matrix = MatrixFactory::create($matrix);
-            $matrix = $matrix->scalarMultiply($this->Ec / (1 - ($this->nu * $this->nu)));
         }
 
         // return
         return $matrix;
+    }
+
+    // theta used in transformation matrix
+    public function calculate_theta($ex, $ey, $Yxy, $thetac = false)
+    {
+
+        // calculate theta
+        if(abs($ex - $ey) < 3 * $this->SNUM){
+          if($Yxy > 0){
+            $theta = PI()/4;
+          }else{
+            $theta = 3 * PI()/4;
+          }
+        }else if(abs($Yxy) < 3 * $this->SNUM){
+          if($ex - $ey > 0){
+            $theta = 0;
+          }else{
+            $theta = PI()/2;
+          }
+        }else{
+            $theta = 0.5 * atan($Yxy / ($ex - $ey));
+            if($ex - $ey < 0){
+              $theta = PI()/2 + $theta;
+            }
+        }
+
+        // return
+        return ($thetac ? ($theta - PI()/2) : ($theta));
     }
 
     public function getElementWiseGlobalStiffness($dmatrix)
@@ -544,9 +641,9 @@ class ShearWallAnalysis extends Common
         $t[0][2] = sin($theta) * cos($theta);
         $t[1][0] = sin($theta) * sin($theta);
         $t[1][1] = cos($theta) * cos($theta);
-        $t[1][2] = -1 * cos($theta) * cos($theta);
+        $t[1][2] = -1 * sin($theta) * cos($theta);
         $t[2][0] = -2 * sin($theta) * cos($theta);
-        $t[2][1] = +2 * cos($theta) * cos($theta);
+        $t[2][1] = +2 * sin($theta) * cos($theta);
         $t[2][2] = cos($theta) * cos($theta) - sin($theta) * sin($theta);
         $t = MatrixFactory::create($t);
 
