@@ -51,9 +51,9 @@ class CombinedAnalysis extends Common
             $shear_results = [];
             foreach ($floors as $floor_id => $disp) {
                 if($floor_id == 0){
-                    $drift = [0, $disp];
+                    $drift = [0, 0.001 * $disp]; //in mm
                 }else{
-                    $drift = [$floors[$floor_id - 1], $disp];
+                    $drift = [0.001 * $floors[$floor_id - 1], 0.001 * $disp];
                 }
                 $shear = new ShearWallAnalysis($drift, $floor_id);
                 $shear->run();
@@ -64,7 +64,8 @@ class CombinedAnalysis extends Common
             $this->dump("Shear File Write Done for timestep => [$time]", true);
         }
         // debug
-        $this->dump("Everything Done...", true);
+        $this->dump("Everything Done...[$prefix]", true);
+        $this->dump("<a target=\"_blank\" href=\"http://127.0.0.1/3d-modal-analysis/postprocess/$prefix\">launch</a>", true);
     }
 }
 

@@ -1,35 +1,52 @@
-function draw_plot(element, legends, data) {
-    $(function() {
-        Highcharts.chart(element, {
+function draw_plot(element) {
+
+    legend = canvasData.modal.plot.disp.legends;
+    switch (element) {
+        case 'floordisp':
+            unit = 'Displacement (mm)';
+            data = canvasData.modal.plot.disp.data;
+            break;
+        case 'eqdata':
+            unit = 'Acceleration (m/s2)';
+            data = canvasData.modal.plot.eq.data;
+            break;
+        case 'baseshear':
+            unit = 'Force (KN)';
+            data = canvasData.modal.plot.baseshear.data;
+            break;
+        default:
+            return;
+    }
+    console.log(data)
+
+    Highcharts.chart(element, {
+        title: {
+            text: element,
+            x: -20 //center
+        },
+        xAxis: {
+            categories: legend
+        },
+        yAxis: {
             title: {
-                text: 'Floor Displacement',
-                x: -20 //center
+                text: unit
             },
-            xAxis: {
-                categories: legends
-            },
-            yAxis: {
-                title: {
-                    text: 'Displacement (mm)'
-                },
-                plotLines: [{
-                    value: 0,
-                    width: 1,
-                    color: '#808080'
-                }]
-            },
-            tooltip: {
-                valueSuffix: '°C'
-            },
-            legend: {
-                layout: 'vertical',
-                align: 'right',
-                verticalAlign: 'middle',
-                borderWidth: 0
-            },
-            series: data
-                // series: [JSON.parse('<?php echo json_encode($data[1]); ?>')]
-        });
+            plotLines: [{
+                value: 0,
+                width: 1,
+                color: '#808080'
+            }]
+        },
+        tooltip: {
+            valueSuffix: '°C'
+        },
+        legend: {
+            layout: 'vertical',
+            align: 'right',
+            verticalAlign: 'middle',
+            borderWidth: 0
+        },
+        series: data
     });
 }
 
@@ -139,7 +156,7 @@ function draw_analysis(step) {
 
 function fillinstrain(context, line, number) {
     number = number * 100000;
-    console.log(number);
+    // console.log(number);
     if (number < 50) {
         // green to yellow
         r = Math.floor(255 * (number / 50));

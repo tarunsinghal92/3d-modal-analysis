@@ -21,11 +21,11 @@
     });
 
     // postprocess route: /
-    $router->get('/(postprocess)', function ($module) {
+    $router->get('/(postprocess)/(\d+)', function ($module, $id) {
 
         // call the tempate
-        $main = new MainController($module);
-        $main->view_results(); 
+        $main = new MainController($module, $id);
+        $main->view_results();
     });
 
     // setup route: /

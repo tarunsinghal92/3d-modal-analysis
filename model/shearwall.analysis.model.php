@@ -25,7 +25,7 @@ class ShearWallAnalysis extends Common
     private $fyx = 430; //Mpa
     private $length = ['a' => 6.0, 'b' => 3.0]; // in meters (x,y)
     public  $t = 0.10; // thickness meters
-    private $num_elements = 6.0; // in each direction so 10*10 elements in total
+    private $num_elements = 8; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
     private $ele_dc_mat = [];
     private $ele_ds_mat = [];
@@ -44,9 +44,10 @@ class ShearWallAnalysis extends Common
     private $Sm = 50.0; //mm Smx, Smy pg 93
     private $SNUM = 10**-9;
     private $iscracked = [];
+    private $legend = [];
 
 
-    public function __construct($given_disp = [0, 0.01], $floor_id = 0)
+    public function __construct($given_disp = [0, 10], $floor_id = 0)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
@@ -154,7 +155,8 @@ class ShearWallAnalysis extends Common
           'elements' => $elements,
           'cracks' => $this->final_cracks,
           'stresses' => $this->final_stress,
-          'strains' => $this->final_strain
+          'strains' => $this->final_strain,
+          'legend' => $this->legend
         ];
 
         return $res;
@@ -165,6 +167,12 @@ class ShearWallAnalysis extends Common
       $stress = [];
       $strain = [];
       $cracks = [];
+      $legend['stress'][0] = ['min' => 1000000000, 'max' => -1000000000];
+      $legend['stress'][1] = ['min' => 1000000000, 'max' => -1000000000];
+      $legend['stress'][2] = ['min' => 1000000000, 'max' => -1000000000];
+      $legend['strain'][0] = ['min' => 1000000000, 'max' => -1000000000];
+      $legend['strain'][1] = ['min' => 1000000000, 'max' => -1000000000];
+      $legend['strain'][2] = ['min' => 1000000000, 'max' => -1000000000];
       for ($i = 0; $i < $this->num_elements; $i++) {
           for ($j = 0; $j < $this->num_elements; $j++) {
               // calculate strains
@@ -185,11 +193,26 @@ class ShearWallAnalysis extends Common
               $stress[$i][$j] = $this->ele_d_mat[$i][$j]->multiply(new Vector([$ex, $ey, $Yxy]))->getColumn(0);
               $strain[$i][$j] = [$ex, $ey, $Yxy];
               $cracks[$i][$j] = $this->calculate_theta($ex, $ey, $Yxy, true);
+
+              //store max
+              $legend['strain'][0]['max'] = max($strain[$i][$j][0], $legend['strain'][0]['max']);
+              $legend['strain'][0]['min'] = min($strain[$i][$j][0], $legend['strain'][0]['min']);
+              $legend['strain'][1]['max'] = max($strain[$i][$j][1], $legend['strain'][1]['max']);
+              $legend['strain'][1]['min'] = min($strain[$i][$j][1], $legend['strain'][1]['min']);
+              $legend['strain'][2]['max'] = max($strain[$i][$j][2], $legend['strain'][2]['max']);
+              $legend['strain'][2]['min'] = min($strain[$i][$j][2], $legend['strain'][2]['min']);
+              $legend['stress'][0]['min'] = min($stress[$i][$j][0], $legend['stress'][0]['min']);
+              $legend['stress'][0]['max'] = max($stress[$i][$j][0], $legend['stress'][0]['max']);
+              $legend['stress'][1]['min'] = min($stress[$i][$j][1], $legend['stress'][1]['min']);
+              $legend['stress'][1]['max'] = max($stress[$i][$j][1], $legend['stress'][1]['max']);
+              $legend['stress'][2]['min'] = min($stress[$i][$j][2], $legend['stress'][2]['min']);
+              $legend['stress'][2]['max'] = max($stress[$i][$j][2], $legend['stress'][2]['max']);
           }
        }
        $this->final_stress = $stress;
        $this->final_strain = $strain;
        $this->final_cracks = $cracks;
+       $this->legend = $legend;
     }
 
     public function check_convergence($old, $iteration)

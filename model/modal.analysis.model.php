@@ -34,11 +34,11 @@ class ModalAnalysis extends Common
     private $modalMatrix;
     private $eqData;
     private $results;
-    private $numFloors = 3;
+    private $numFloors = 6;
     private $wallThickness = 0.1; // m
-    private $massFloor = 3000; //kg
+    private $massFloor = 0.407; //kN s2 / mm
     private $floorWidth = 6; //m
-    private $youngModulusMultI = 60000;  // KN m2
+    private $youngModulusMultI = 80000;  // KN m2
     private $heightColumn = 3; // in m
     private $damping = 0.05; // 5% in 1st and N-1th floors
     private $eqFile;
@@ -82,10 +82,11 @@ class ModalAnalysis extends Common
         foreach ($this->results['displacement'] as $time => $floors) {
             $t = ['time'    => floatval($time),'floors'  => []];
             foreach ($floors as $floor => $disp) {
-                $n1 = [((isset($floors[$floor - 1]) ? $floors[$floor - 1] : 0.0) * DISP_MAG) * OVERALL_MAG,($floor * $FH) * OVERALL_MAG];
+                $disp = 0.001 * $disp; //convert to m
+                $n1 = [((isset($floors[$floor - 1]) ? 0.001 * $floors[$floor - 1] : 0.0) * DISP_MAG) * OVERALL_MAG,($floor * $FH) * OVERALL_MAG];
                 $n2 = [(($disp * DISP_MAG) + 0) * OVERALL_MAG,(($floor + 1) * $FH) * OVERALL_MAG];
                 $n3 = [(($disp * DISP_MAG) + $FW) * OVERALL_MAG,(($floor + 1) * $FH) * OVERALL_MAG];
-                $n4 = [((isset($floors[$floor - 1]) ? $floors[$floor - 1] : 0.0) * DISP_MAG + $FW) * OVERALL_MAG,($floor * $FH) * OVERALL_MAG];
+                $n4 = [((isset($floors[$floor - 1]) ? 0.001 * $floors[$floor - 1] : 0.0) * DISP_MAG + $FW) * OVERALL_MAG,($floor * $FH) * OVERALL_MAG];
                 $t['floors'][$floor] = array(
                     [$n1, $n2],
                     [$n2, $n3],
@@ -100,25 +101,45 @@ class ModalAnalysis extends Common
     public function makePlotData()
     {
         //plot data
-        $data = [];
         $cat = [];
         $ltime = 50000000;
 
+        // el centro plot
+        $data = [];
         foreach ($this->results['eqdata'] as $time => $val) {
             if($time > $ltime) continue;
             $data[0]['name'] = 'El Centro ';
-            $data[0]['data'][] = $val * 1;
+            $data[0]['data'][] = $val * 0.001;
+            $cat[] = $time;
         }
+        $this->results['plot']['eq'] = ['legends' => $cat, 'data' => $data];
 
+        // floor drift plot
+        $data = [];
         foreach ($this->results['displacement'] as $time => $floor) {
             if($time > $ltime) continue;
             foreach ($floor as $id => $disp) {
-                $data[$id + 1]['name'] = 'Floor ' . ($id + 1);
-                $data[$id + 1]['data'][] = $disp * 1000;
+                $data[$id]['name'] = 'Floor ' . ($id + 1);
+                $data[$id]['data'][] = $disp;// mm
             }
-            $cat[] = $time;
         }
-        $this->results['plot'] = ['legends' => $cat, 'data' => $data];
+        $this->results['plot']['disp'] = ['legends' => $cat, 'data' => $data];
+
+        // base shear plot
+        $k = $this->get_floor_stiffness();
+        unset($data);
+        $data[0]['name'] = 'Base Shear';
+        $data[0]['data'] = [];
+        foreach ($this->results['displacement'] as $time => $floor) {
+            if($time > $ltime) continue;
+            $sum = 0;
+            foreach ($floor as $id => $disp) {
+                $sum += -1 * $disp * $k;
+            }
+            $data[0]['data'][] = $sum;
+        }
+        $this->results['plot']['baseshear'] = ['legends' => $cat, 'data' => $data];
+
     }
 
     public function runNewmarkAnalysis()
@@ -235,7 +256,7 @@ class ModalAnalysis extends Common
             while (($line = fgets($handle)) !== false) {
                 // process the line read.
                 if($cnt != 0){
-                    $eq[((preg_split('/\t/', $line))[0])] = floatval((preg_split('/\t/', $line)[1]));
+                    $eq[((preg_split('/\t/', $line))[0])] = 9810 * floatval((preg_split('/\t/', $line)[1]));
                 }else{
                     $eq['0.0'] = 0.0;
                 }
@@ -319,7 +340,7 @@ class ModalAnalysis extends Common
         $this->show($this->dampingMatrix);
     }
 
-    public function makeStiffnessMatrix()
+    public function get_floor_stiffness()
     {
         /**
          * @Assumption:
@@ -333,6 +354,16 @@ class ModalAnalysis extends Common
 
         //shearwall stuffness [from EQ ppt]
         $k += 3 * $this->youngModulusMultI / ($this->heightColumn**3 * (1+ 0.6*(1+0.3)*($this->floorWidth / $this->heightColumn)**2));
+
+        // return
+        return $k * 10**-3;
+    }
+
+    public function makeStiffnessMatrix()
+    {
+
+        // get floor stiffness
+        $k = $this->get_floor_stiffness();
 
         //2DOF stiffness
         $stiffness2DOF = [

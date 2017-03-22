@@ -16,6 +16,7 @@ class MainController extends Common{
      private $results;
      private $final_results;
      private $results2;
+     private $id;
 
     /**
      * [$module description]
@@ -27,10 +28,11 @@ class MainController extends Common{
      * [__construct description]
      * @param [type] $module [description]
      */
-    public function __construct($module){
+    public function __construct($module, $id = 0){
 
         //define var
         $this->module = $module;
+        $this->id = $id;
     }
 
     /**
@@ -85,7 +87,7 @@ class MainController extends Common{
     {
         // fetch data from files
         $obj = new CombinedAnalysis();
-        $this->final_results = $obj->fetchResultsFromFiles(13887);
+        $this->final_results = $obj->fetchResultsFromFiles($this->id);
 
         // show everthing in template
         $this->show_template();
