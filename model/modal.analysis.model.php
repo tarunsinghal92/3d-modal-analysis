@@ -34,7 +34,7 @@ class ModalAnalysis extends Common
     private $modalMatrix;
     private $eqData;
     private $results;
-    private $numFloors = 6;
+    private $numFloors = 3;
     private $wallThickness = 0.1; // m
     private $massFloor = 0.407; //kN s2 / mm
     private $floorWidth = 6; //m

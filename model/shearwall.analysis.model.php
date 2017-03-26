@@ -17,21 +17,21 @@ class ShearWallAnalysis extends Common
     private $fc_dash = 21.8; // MPa
     private $ft_dash = 1.54; // MPa
     private $ec_dash = -0.0018; // dimensionless
-    private $rho_x = 1; // %
-    private $rho_y = 1; // %
+    private $rho_x = 3.0; // %
+    private $rho_y = 1.0; // %
     public  $Ec = 24200; // MPa
     private $Es = 200000; // Mpa
     private $nu = 0.30; // Mpa
     private $fyx = 430; //Mpa
     private $length = ['a' => 6.0, 'b' => 3.0]; // in meters (x,y)
     public  $t = 0.10; // thickness meters
-    private $num_elements = 8; // in each direction so 10*10 elements in total
+    private $num_elements = 12; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
     private $ele_dc_mat = [];
     private $ele_ds_mat = [];
     private $ele_k_mat = [];
     private $global_k_mat;
-    private $num_iterations = 5;
+    private $num_iterations = 10;
     private $connectivity_list = [];
     private $displacements = [];
     private $forces = [];
@@ -47,7 +47,7 @@ class ShearWallAnalysis extends Common
     private $legend = [];
 
 
-    public function __construct($given_disp = [0, 10], $floor_id = 0)
+    public function __construct($given_disp = [0, 0.005], $floor_id = 0)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
@@ -90,7 +90,10 @@ class ShearWallAnalysis extends Common
             $this->solve_matrix();
 
             // check converge$this
-            $this->check_convergence($this->old_global_k_mat, $i);
+            $check = $this->check_convergence($this->old_global_k_mat, $i);
+            if($check < TOLERANCE){
+                break;
+            }
         }
 
         // calculate material stress and strains
@@ -227,6 +230,7 @@ class ShearWallAnalysis extends Common
             $sum += array_sum($diff[$i]);
         }
         $this->dump('iteration: [' . $iteration . ' => ' . ($sum / $total) . ']', false);
+        return $sum / $total;
     }
 
     public function get_forces()
@@ -241,6 +245,52 @@ class ShearWallAnalysis extends Common
             }
         }
         $this->forces = $forces;
+    }
+
+    public function get_displacements()
+    {
+        // empty array
+        $given_disp = $this->given_disp;
+        $ls = 1;
+        $rs = 1;
+        $nx = (1 + $this->num_elements);
+        $step =  $this->length['b'] / $this->num_elements;
+        $tnodes = $nx * $nx;
+        $disp = array_fill(0, (2 * $tnodes), 'unknown');
+
+        // set disp
+        for ($i = 0; $i < count($disp); $i++) {
+
+            // set lower one to -1 i.e. fixed dofs {both x & y}
+            if(0 <= $i && $i < $nx){
+                $disp[$i] = -1;
+                $disp[$i + $tnodes] = -1;
+            }
+
+            // set upper one to 0.1 i.e. some disp {only x}
+            if(($nx * ($nx - 1)) <= $i && $i < ($nx * $nx)){
+                $disp[$i] = $given_disp[1] - $given_disp[0];
+                // set upper one to 0 i.e. roller case disp {only y}
+                $disp[$i + $tnodes] = -1;
+            }
+
+            // set left side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
+            if(($nx * $ls) == $i && $i < $tnodes){
+                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
+                // $disp[$i + $tnodes] = 0; // NOPES
+                $ls++;
+            }
+
+            // set right side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
+            if(($nx * ($rs + 1) - 1) == $i && $i < $tnodes){
+                $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
+                // $disp[$i + $tnodes] = 0; // NOPES
+                $rs++;
+            }
+        }
+
+        // store
+        $this->displacements = $disp;
     }
 
     public function solve_matrix()
@@ -271,13 +321,22 @@ class ShearWallAnalysis extends Common
         // form force matrix
         $this->payne_iron_solver($stiff->getMatrix(), $disp, $forces);
 
-        // store
-        $this->displacements = $disp;
-        $this->forces = $forces;
+        //restore dofs
+        $cnt = 0;
+        foreach ($this->displacements as $key => $value) {
+            if(in_array($key, $removelist)){
+                $this->displacements[$key] = 0;
+            }else{
+                $this->displacements[$key] = $disp[$cnt];
+                $cnt++;
+            }
+        }
 
+        // store
+        $this->forces = $this->global_k_mat->multiply(new Vector($this->displacements))->getColumn(0);
     }
 
-    public function payne_iron_solver($a, &$x, &$b)
+    public function payne_iron_solver($a, &$x, $b)
     {
         // set to big num
         $s = $a;
@@ -291,58 +350,8 @@ class ShearWallAnalysis extends Common
         $s = MatrixFactory::create($s);
 
         // solve
-        // $x = $a->solve($b); // not using math-php lib
         $x = new Vector($this->gauss($a, $b)); // this is much faster
-
-        $b = $s->multiply($x);
         $x = $x->getVector();
-        $b = $b->getColumn(0);
-    }
-
-    public function get_displacements()
-    {
-        // empty array
-        $given_disp = $this->given_disp;
-        $ls = 1;
-        $rs = 1;
-        $nx = (1 + $this->num_elements);
-        $step =  $this->length['b'] / $this->num_elements;
-        $tnodes = $nx * $nx;
-        $disp = array_fill(0, (2 * $tnodes), 'unknown');
-
-        // set disp
-        for ($i = 0; $i < count($disp); $i++) {
-
-            // set lower one to -1 i.e. fixed dofs {both x & y}
-            if(0 <= $i && $i < $nx){
-                $disp[$i] = 0;
-                $disp[$i + $tnodes] = 0;
-            }
-
-            // set upper one to 0.1 i.e. some disp {only x}
-            if(($nx * ($nx - 1)) <= $i && $i < ($nx * $nx)){
-                $disp[$i] = $given_disp[1] - $given_disp[0];
-                // set upper one to 0 i.e. roller case disp {only y}
-                $disp[$i + $tnodes] = 0;
-            }
-
-            // set left side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
-            if(($nx * $ls) == $i && $i < $tnodes){
-                // $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $ls * $step)/(3 * $this->length['b'])) * (($ls * $step)**2);
-                // $disp[$i + $tnodes] = 0; // NOPES
-                $ls++;
-            }
-
-            // set right side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
-            if(($nx * ($rs + 1) - 1) == $i && $i < $tnodes){
-                // $disp[$i] = (3.0 * ($given_disp[1] - $given_disp[0]) / $this->length['b']**2) * (1 - (2 * $rs * $step)/(3 * $this->length['b'])) * (($rs * $step)**2);
-                // $disp[$i + $tnodes] = 0; // NOPES
-                $rs++;
-            }
-        }
-
-        // store
-        $this->displacements = $disp;
     }
 
     public function getGlobalStiffness($iteration)
@@ -445,7 +454,7 @@ class ShearWallAnalysis extends Common
         $this->iscracked[$i][$j] = $this->check_if_cracked($this->iscracked[$i][$j], $i, $j);
 
         // check stage type : linear or non linear
-        if($this->iscracked[$i][$j] === 0){
+        if($this->iscracked[$i][$j] === 0 || true){
 
             // for concrete
             $c = $this->initialize_matrix(3);
@@ -539,8 +548,25 @@ class ShearWallAnalysis extends Common
         $ep = $beta * $this->ec_dash;
         $fp = $beta * $this->fc_dash;
 
+        if(0 < abs($ec2) && abs($ec2) < abs($ep)){
+            $fc2 = -$fp * (2 * ($ec2 / $ep) - ($ec2 / $ep)**2);
+        }else if(abs($ep) < abs($ec2) && abs($ec2) < abs($this->ec_dash)){
+            $fc2 = -$fp;
+        }else{
+            $fc2 = -$fp * (2 * ($ec2 / $this->ec_dash) - ($ec2 / $this->ec_dash)**2);
+        }
+        return $fc2;
+    }
+
+
+    public function get_fc2_old($ec1, $ec2)
+    {
+        $fc2 = 0;
+        $beta = min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0);
+        $ep = $beta * $this->ec_dash;
+        $fp = $beta * $this->fc_dash;
+
         if(0 < $ec2 && $ec2 < $ep){
-            // echo "yes => [$ec1][$ec2][$beta]<br>";
             $fc2 = -$fp * (2 * ($ec2 / $ep) - ($ec2 / $ep)**2);
         }else if($ep < $ec2 && $ec2 < $this->ec_dash){
             $fc2 = -$fp;
@@ -669,8 +695,6 @@ class ShearWallAnalysis extends Common
         $t[2][1] = +2 * sin($theta) * cos($theta);
         $t[2][2] = cos($theta) * cos($theta) - sin($theta) * sin($theta);
         $t = MatrixFactory::create($t);
-
-        // return transfrmed matrix
         return $t->transpose()->multiply($mat)->multiply($t);
     }
 

@@ -17,7 +17,7 @@ function draw_plot(element) {
         default:
             return;
     }
-    console.log(data)
+    // console.log(data)
 
     Highcharts.chart(element, {
         title: {
@@ -118,7 +118,7 @@ function draw_analysis(step) {
                 line = canvasData.shear[step][floor].elements[fx][fy];
                 data = canvasData.shear[step][floor];
                 if (result_type[0] == 'stresses') {
-                    fillinstress(context, line, 50 + 2 * data[result_type[0]][fx][fy][result_type[1]]);
+                    fillinstress(context, line, 12 * Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
                 } else {
                     fillinstrain(context, line, Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
                 }
@@ -153,9 +153,12 @@ function draw_analysis(step) {
         }
     }
 }
+var stmax = [];
+var ssmax = [];
 
 function fillinstrain(context, line, number) {
     number = number * 100000;
+    // stmax.push(number);
     // console.log(number);
     if (number < 50) {
         // green to yellow
@@ -179,7 +182,7 @@ function fillinstrain(context, line, number) {
 }
 
 function fillinstress(context, line, number) {
-    // number = number * 100000;
+    // ssmax.push(number);
     if (number < 50) {
         // green to yellow
         r = Math.floor(255 * (number / 50));
@@ -352,7 +355,7 @@ function draw_analysis2(data) {
     canvas = document.getElementById('myCanvas');
     context = canvas.getContext('2d');
     canvasData = data;
-    console.log(data);
+    // console.log(data);
     context.save();
     context.translate(600, 600);
     context.scale(1, -1);
