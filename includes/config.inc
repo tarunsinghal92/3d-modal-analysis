@@ -23,6 +23,6 @@ define('DISP_MAG', 50.0);
 define('DEBUG', false);
 
 
-define('TOLERANCE', 0.01);
+define('TOLERANCE', 0.1);
 
 ?>

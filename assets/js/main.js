@@ -123,7 +123,7 @@ function draw_analysis(step) {
                     fillinstrain(context, line, Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
                 }
                 if (data.cracks[fx][fy].iscracked == true) {
-                    draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].width); //crack
+                    draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].dwidth); //crack
                 }
                 draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
                 draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
@@ -157,9 +157,10 @@ var stmax = [];
 var ssmax = [];
 
 function fillinstrain(context, line, number) {
-    number = number * 100000;
-    // stmax.push(number);
-    // console.log(number);
+    number = number * 50000;
+    number = Math.min(100, number)
+        // stmax.push(number);
+        // console.log(number);
     if (number < 50) {
         // green to yellow
         r = Math.floor(255 * (number / 50));
@@ -209,8 +210,7 @@ function draw_line3(context, posx1, posy1, posx2, posy2, width) {
     context.moveTo(posx1, posy1);
     context.lineTo(posx2, posy2);
     context.globalAlpha = 0.8;
-    context.lineWidth = Math.min(width, 5); // change to it actual width @todo
-    context.lineWidth = .5; // change to it actual width @todo
+    context.lineWidth = width; // change to it actual width @todo
     context.stroke();
 }
 
@@ -355,7 +355,7 @@ function draw_analysis2(data) {
     canvas = document.getElementById('myCanvas');
     context = canvas.getContext('2d');
     canvasData = data;
-    // console.log(data);
+    console.log(data)
     context.save();
     context.translate(600, 600);
     context.scale(1, -1);
@@ -364,9 +364,10 @@ function draw_analysis2(data) {
     for (var fx in canvasData.elements) {
         for (var fy in canvasData.elements[fx]) {
             line = canvasData.elements[fx][fy];
-            fillinstress(context, line, 50 + 2 * (data.stresses[fx][fy][1]));
+            fillinstrain(context, line, Math.abs(data.strains[fx][fy][2]));
+            // fillinstress(context, line, 10 * (data.stresses[fx][fy][2]));
             if (data.cracks[fx][fy].iscracked == true) {
-                draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].width); //crack
+                draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].dwidth); //crack
             }
             draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
             draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
