@@ -1,5 +1,53 @@
 
+<style>
+  .btn_container {
+    position: fixed;
+    right: 150px;
+    top: 150px;
+  }
+  .btn_container button{
+    width: 80px;
+    margin: 5px;
+    height: 30px;
+    font-size: 13px;}
+</style>
 <canvas id="myCanvas" width="2000" height="1000"></canvas>
+<div class="btn_container">
+    <button id="ex" onclick="change_result2(this)" type="button">&epsilon;<sub>x</sub></button><br>
+    <button id="ey" onclick="change_result2(this)" type="button">&epsilon;<sub>y</sub></button><br>
+    <button id="Yxy" onclick="change_result2(this)" type="button">&gamma;<sub>xy</sub></button><br>
+    <button id="fx" onclick="change_result2(this)" type="button">&sigma;<sub>x</sub></button><br>
+    <button id="fy" onclick="change_result2(this)" type="button">&sigma;<sub>y</sub></button><br>
+    <button id="Txy" onclick="change_result2(this)" type="button">&tau;<sub>xy</sub></button>
+</div>
+
 <script>
-    draw_analysis2(JSON.parse('<?php echo json_encode($this->results2); ?>'));
+    setup_canvas(JSON.parse('<?php echo json_encode($this->results2); ?>'))
+    draw_analysis2();
+    function change_result2(obj) {
+        setResult_type($(obj).attr('id'));
+        draw_analysis2();
+    }
+    console.log('-----------------------------------------------------')
+    console.log('Total X Restrain Force: ' + canvasData.force + ' kN')
+    console.log('-----------------------------------------------------')
+    var l1 = parseInt(canvasData.stresses.length / 4);
+    for (var i in canvasData.stresses) {
+        for (var j in canvasData.stresses[i]) {
+            if( (i == l1 && j == l1) ||
+                (i == l1 && j == l1*3) ||
+                (i == l1*3 && j == l1) ||
+                (i == l1*3 && j == l1*3)
+              ){
+                  console.log('------------element[' + i + '][' + j + ']--------------')
+                  console.log('sigmax: ' + canvasData.stresses[i][j][0] + ' MPA');
+                  console.log('sigmay: ' + canvasData.stresses[i][j][1] + ' MPA');
+                  console.log('tauxy: ' + canvasData.stresses[i][j][2] + ' MPA');
+                  console.log('wex: ' + canvasData.strains[i][j][0] + ' mm/mm');
+                  console.log('ey: ' + canvasData.strains[i][j][1] + ' mm/mm');
+                  console.log('gammaxy: ' + canvasData.strains[i][j][2] + ' mm/mm');
+                  console.log('------------element[' + i + '][' + j + ']---------------')
+            }
+        }
+    }
 </script>

@@ -34,16 +34,16 @@ class ModalAnalysis extends Common
     private $modalMatrix;
     private $eqData;
     private $results;
-    private $numFloors = 3;
+    public  $numFloors = 3;
     private $wallThickness = 0.1; // m
     private $massFloor = 0.407; //kN s2 / mm
-    private $floorWidth = 6; //m
+    private $floorWidth = 4.5; //m
     private $youngModulusMultI = 80000;  // KN m2
     private $heightColumn = 3; // in m
     private $damping = 0.05; // 5% in 1st and N-1th floors
     private $eqFile;
     private $timeStep = 0.02; //sec means half of 0.2 ie 0.1
-    private $analysisLength = 1.0; //sec
+    private $analysisLength = 5.0; //sec extra for analysis
     private $newMarkCons = [
       'alpha' => 0.5,
       'beta'  => 0.25

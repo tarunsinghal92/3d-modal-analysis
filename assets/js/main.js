@@ -69,34 +69,37 @@ function clear(context, color) {
 }
 
 function change_result(obj) {
-    type = $(obj).attr('id');
-
-    switch (type) {
-        case 'ex':
-            result_type = ['strains', 0];
-            break;
-        case 'ey':
-            result_type = ['strains', 1];
-            break;
-        case 'Yxy':
-            result_type = ['strains', 2];
-            break;
-        case 'fx':
-            result_type = ['stresses', 0];
-            break;
-        case 'fy':
-            result_type = ['stresses', 1];
-            break;
-        case 'Txy':
-            result_type = ['stresses', 2];
-            break;
-        default:
-            result_type = ['stresses', 0];
-    }
+    setResult_type($(obj).attr('id'));
     draw_analysis($('#slider').slider("option", "value"));
 }
 
-var result_type = ['strains', 2];
+
+function setResult_type(type) {
+    switch (type) {
+        case 'ex':
+            result_type = ['strains', 0, [-5, 20]];
+            break;
+        case 'ey':
+            result_type = ['strains', 1, [-200, 320]];
+            break;
+        case 'Yxy':
+            result_type = ['strains', 2, [0, 130]];
+            break;
+        case 'fx':
+            result_type = ['stresses', 0, [-6, 2]];
+            break;
+        case 'fy':
+            result_type = ['stresses', 1, [-25, 5]];
+            break;
+        case 'Txy':
+            result_type = ['stresses', 2, [0, 10]];
+            break;
+        default:
+            result_type = ['stresses', 0, [-6, 2]];
+    }
+}
+
+var result_type = ['stresses', 2, [-10, 3]];
 
 function draw_analysis(step) {
 
@@ -118,29 +121,17 @@ function draw_analysis(step) {
                 line = canvasData.shear[step][floor].elements[fx][fy];
                 data = canvasData.shear[step][floor];
                 if (result_type[0] == 'stresses') {
-                    fillinstress(context, line, 12 * Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
+                    fillinstress(context, line, (data[result_type[0]][fx][fy][result_type[1]]));
                 } else {
-                    fillinstrain(context, line, Math.abs(data[result_type[0]][fx][fy][result_type[1]]));
+                    fillinstrain(context, line, (data[result_type[0]][fx][fy][result_type[1]]));
                 }
-                if (data.cracks[fx][fy].iscracked == true) {
+                if (data.cracks[fx][fy].iscracked == 1) {
                     draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].dwidth); //crack
                 }
                 draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);
                 draw_line2(context, line[1][0], line[1][1], line[2][0], line[2][1], 0.8);
                 draw_line2(context, line[2][0], line[2][1], line[3][0], line[3][1], 0.8);
                 draw_line2(context, line[3][0], line[3][1], line[0][0], line[0][1], 0.8);
-
-                // create a tool-tip instance:
-                // var t1 = new ToolTip(canvas, {
-                //     x1: line[0][0] + 600,
-                //     y1: line[0][1] + 600,
-                //     x2: line[1][0] + 600,
-                //     y2: line[1][1] + 600,
-                //     x3: line[2][0] + 600,
-                //     y3: line[2][1] + 600,
-                //     x4: line[3][0] + 600,
-                //     y4: line[3][1] + 600,
-                // }, ("This is element" + fx + ',' + fy), 150, 3000);
             }
         }
     }
@@ -157,21 +148,35 @@ var stmax = [];
 var ssmax = [];
 
 function fillinstrain(context, line, number) {
-    number = number * 50000;
-    number = Math.min(100, number)
-        // stmax.push(number);
-        // console.log(number);
-    if (number < 50) {
-        // green to yellow
-        r = Math.floor(255 * (number / 50));
-        g = 255;
+
+    //as per vector 2
+    number = number * 100000;
+    number = 100 * ((number - result_type[2][0]) / (result_type[2][1] - result_type[2][0]));
+    number = Math.min(number, Math.max(number, 0));
+    if (number <= 25) {
+        // dark blue to purple
+        r = Math.floor(255 * (number / 25));
+        g = 0;
+        b = 255;
+
+    } else if (number > 25 && number <= 50) {
+        // purple to red
+        r = 255;
+        g = 0;
+        b = Math.floor(255 * ((50 - number) / 25));
+
+    } else if (number > 50 && number <= 75) {
+        // red to brown
+        r = 255;
+        g = Math.floor(255 * ((number - 50) / 25));
+        b = 0;
 
     } else {
-        // yellow to red
-        r = 255;
-        g = Math.floor(255 * ((50 - number % 50) / 50));
+        // brown to green
+        r = Math.floor(255 * ((100 - number) / 25));
+        g = 255;
+        b = 0;
     }
-    b = 0;
     context.beginPath();
     context.moveTo(line[0][0], line[0][1]);
     context.lineTo(line[1][0], line[1][1]);
@@ -183,18 +188,34 @@ function fillinstrain(context, line, number) {
 }
 
 function fillinstress(context, line, number) {
-    // ssmax.push(number);
-    if (number < 50) {
-        // green to yellow
-        r = Math.floor(255 * (number / 50));
-        g = 255;
+
+    //as per vector 2
+    number = 100 * ((number - result_type[2][0]) / (result_type[2][1] - result_type[2][0]));
+    number = Math.min(number, Math.max(number, 0));
+    if (number <= 25) {
+        // dark blue to purple
+        r = Math.floor(255 * (number / 25));
+        g = 0;
+        b = 255;
+
+    } else if (number > 25 && number <= 50) {
+        // purple to red
+        r = 255;
+        g = 0;
+        b = Math.floor(255 * ((50 - number) / 25));
+
+    } else if (number > 50 && number <= 75) {
+        // red to brown
+        r = 255;
+        g = Math.floor(255 * ((number - 50) / 25));
+        b = 0;
 
     } else {
-        // yellow to red
-        r = 255;
-        g = Math.floor(255 * ((50 - number % 50) / 50));
+        // brown to green
+        r = Math.floor(255 * ((100 - number) / 25));
+        g = 255;
+        b = 0;
     }
-    b = 0;
     context.beginPath();
     context.moveTo(line[0][0], line[0][1]);
     context.lineTo(line[1][0], line[1][1]);
@@ -204,6 +225,44 @@ function fillinstress(context, line, number) {
     context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
     context.fill();
 }
+
+function fillinstressbkp2(context, line, number) {
+    // abaqus gradient
+    number = Math.min(number, 100)
+    if (number <= 25) {
+        // dark blue to light blue
+        r = 0;
+        g = Math.floor(255 * (number / 25));
+        b = 255;
+
+    } else if (number > 25 && number <= 50) {
+        // blue to green
+        r = 0;
+        g = 255;
+        b = Math.floor(255 * ((50 - number) / 25));
+
+    } else if (number > 50 && number <= 75) {
+        // green to yellow
+        r = Math.floor(255 * ((number - 50) / 25));
+        g = 255;
+        b = 0;
+
+    } else {
+        // yellow to red
+        r = 255;
+        g = Math.floor(255 * ((100 - number) / 25));
+        b = 0;
+    }
+    context.beginPath();
+    context.moveTo(line[0][0], line[0][1]);
+    context.lineTo(line[1][0], line[1][1]);
+    context.lineTo(line[2][0], line[2][1]);
+    context.lineTo(line[3][0], line[3][1]);
+    context.closePath();
+    context.fillStyle = "rgb(" + r + "," + g + "," + b + ")";
+    context.fill();
+}
+
 
 function draw_line3(context, posx1, posy1, posx2, posy2, width) {
     context.beginPath();
@@ -349,24 +408,22 @@ function ToolTip(canvas, region, text, width, timeout) {
 
 }
 
-function draw_analysis2(data) {
+function draw_analysis2() {
 
-    // setup canvas
-    canvas = document.getElementById('myCanvas');
-    context = canvas.getContext('2d');
-    canvasData = data;
-    console.log(data)
-    context.save();
-    context.translate(600, 600);
-    context.scale(1, -1);
+    // clear canvas
+    clear(context, '#ffffff');
+    data = canvasData;
 
     //get canvas element
     for (var fx in canvasData.elements) {
         for (var fy in canvasData.elements[fx]) {
             line = canvasData.elements[fx][fy];
-            fillinstrain(context, line, Math.abs(data.strains[fx][fy][2]));
-            // fillinstress(context, line, 10 * (data.stresses[fx][fy][2]));
-            if (data.cracks[fx][fy].iscracked == true) {
+            if (result_type[0] == 'stresses') {
+                fillinstress(context, line, (data[result_type[0]][fx][fy][result_type[1]]));
+            } else {
+                fillinstrain(context, line, (data[result_type[0]][fx][fy][result_type[1]]));
+            }
+            if (data.cracks[fx][fy].iscracked == 1) {
                 draw_line3(context, data.cracks[fx][fy].pos1[0], data.cracks[fx][fy].pos1[1], data.cracks[fx][fy].pos2[0], data.cracks[fx][fy].pos2[1], data.cracks[fx][fy].dwidth); //crack
             }
             draw_line2(context, line[0][0], line[0][1], line[1][0], line[1][1], 0.8);

@@ -23,15 +23,15 @@ class ShearWallAnalysis extends Common
     private $Es = 200000; // Mpa
     private $nu = 0.30; // Mpa
     private $fyx = 430; //Mpa
-    private $length = ['a' => 6.0, 'b' => 3.0]; // in meters (x,y)
+    private $length = ['a' => 4.5, 'b' => 3.0]; // in meters (x,y)
     public  $t = 0.10; // thickness meters
-    private $num_elements = 8; // in each direction so 10*10 elements in total
+    public  $num_elements = 15; // in each direction so 10*10 elements in total
     private $ele_d_mat = [];
     private $ele_dc_mat = [];
     private $ele_ds_mat = [];
     private $ele_k_mat = [];
     private $global_k_mat;
-    private $num_iterations = 20;
+    private $num_iterations = 6;
     private $connectivity_list = [];
     private $displacements = [];
     private $forces = [];
@@ -47,7 +47,7 @@ class ShearWallAnalysis extends Common
     private $legend = [];
 
 
-    public function __construct($given_disp = [0, -0.005], $floor_id = 0)
+    public function __construct($given_disp = [0, 0.005], $floor_id = 0)
     {
         $dofs =  2 * (1 + $this->num_elements) * (1 + $this->num_elements);
         $this->global_k_mat = MatrixFactory::create($this->initialize_matrix($dofs));
@@ -134,7 +134,7 @@ class ShearWallAnalysis extends Common
                 $dwidth = min(10 * $width, 1);
 
                 $this->final_cracks[$i][$j] = [
-                  'iscracked'  => (intval(abs(rad2deg($angle))) == 0 ? false : true),
+                  'iscracked'  => ($this->iscracked[$i][$j] == 0 ? false : true),
                   'theta'      => rad2deg($angle),
                   'width'      => $width,
                   'dwidth'     => $dwidth,
@@ -149,6 +149,25 @@ class ShearWallAnalysis extends Common
 
         $this->legend['cracks'] = [$lcracks];
 
+        // get total forces at base
+        $total_force = 0;
+        $nx = (1 + $this->num_elements);
+        for ($i = 0; $i < count($this->forces); $i++) {
+            // if(0 <= $i && $i < $nx){
+            if(($nx * ($nx - 1)) <= $i && $i < ($nx * $nx)){
+                $total_force += $this->forces[$i] * 1000; //convert to KN
+            }
+        }
+
+        // get total cracked elements
+        $total_cracked = 0;
+        foreach ($this->iscracked as $k1 => $value) {
+            foreach ($value as $k2 => $crackval) {
+                $total_cracked += $crackval;
+            }
+        }
+        $total_cracked = round($total_cracked * 100 / ($this->num_elements*$this->num_elements) , 2);
+
         $res = [
           'connectivity' => $this->connectivity_list,
           'displacements' => $this->displacements,
@@ -156,7 +175,9 @@ class ShearWallAnalysis extends Common
           'cracks' => $this->final_cracks,
           'stresses' => $this->final_stress,
           'strains' => $this->final_strain,
-          'legend' => $this->legend
+          'legend' => $this->legend,
+          'force' => $total_force,
+          'total_cracked' => $total_cracked
         ];
 
         return $res;
@@ -256,7 +277,7 @@ class ShearWallAnalysis extends Common
             if(($nx * ($nx - 1)) <= $i && $i < ($nx * $nx)){
                 $disp[$i] = $given_disp[1] - $given_disp[0];
                 // set upper one to 0 i.e. roller case disp {only y}
-                // $disp[$i + $tnodes] = -1;
+                $disp[$i + $tnodes] = -1;
             }
 
             // set left side one to 0.1 by linearly variation i.e. some disp from 0.0 to 0.1 {only x}
@@ -472,7 +493,6 @@ class ShearWallAnalysis extends Common
         return $c->add($rx)->add($ry);
     }
 
-
     public function get_non_linear_stiffness($i,$j)
     {
         // calculate strains
@@ -484,7 +504,7 @@ class ShearWallAnalysis extends Common
         $theta = $this->calculate_theta($ex, $ey, $Yxy);
 
         // check yeilding across check
-        $fc1 = $this->ft_dash * (1 + sqrt(200 * abs($ec1)));
+        $fc1 = $this->ft_dash * (1 + sqrt(200 * abs($ec1))); //collins mitchel
         $fsx = min(abs($this->Es * $ex), $this->fyx);
         $fsy = min(abs($this->Es * $ey), $this->fyx);
         $fc1_star = 0.01 * $this->rho_x * ($this->fyx - $fsx) * cos($theta - 0)**2;
@@ -549,7 +569,7 @@ class ShearWallAnalysis extends Common
     public function get_fc2($ec1, $ec2)
     {
         $fc2 = 0;
-        $beta = max(abs($this->SNUM), min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0));
+        $beta = max(abs($this->SNUM), min(((0.85 - 0.27 * ($ec1 / $ec2))**-1), 1.0)); //1986
         $ep = $beta * $this->ec_dash;
         $fp = $beta * $this->fc_dash;
 

@@ -28,6 +28,44 @@ class CombinedAnalysis extends Common
             }
         }
 
+        // get shear stress vs strain curve for center element of wall
+        $file = fopen('results/shear_stress_vs_time_curve.txt','w+');
+        foreach ($res['shear'] as $time => $data) {
+            $s = ($time * .02);
+            for ($i=0; $i < count($data); $i++) {
+                $ele = intval(count($data[$i]['stresses']) / 2);
+                $s .= ','. $data[$i]['stresses'][$ele][$ele][2];
+            }
+            $s .= PHP_EOL;
+            fwrite($file, $s);
+        }
+        fclose($file);
+
+        // get shear stress vs strain curve for center element of wall
+        $file = fopen('results/shear_strain_vs_time_curve.txt','w+');
+        foreach ($res['shear'] as $time => $data) {
+            $s = ($time * .02);
+            for ($i=0; $i < count($data); $i++) {
+                $ele = intval(count($data[$i]['strains']) / 2);
+                $s .= ','. $data[$i]['strains'][$ele][$ele][2];
+            }
+            $s .= PHP_EOL;
+            fwrite($file, $s);
+        }
+        fclose($file);
+
+        // save % cracked element floor wise
+        $file = fopen('results/percent_cracked_vs_time_curve.txt','w+');
+        foreach ($res['shear'] as $time => $data) {
+            $s = ($time * .02);
+            for ($i=0; $i < count($data); $i++) {
+                $s .= ','. $data[$i]['total_cracked'];
+            }
+            $s .= PHP_EOL;
+            fwrite($file, $s);
+        }
+        fclose($file);
+
         // return
         return $res;
     }
@@ -37,7 +75,7 @@ class CombinedAnalysis extends Common
         $prefix = rand(1, 100000);
 
         // run modal analysis
-        $modal = new ModalAnalysis('data/el-centro-tiny.dat');
+        $modal = new ModalAnalysis('data/el-centro-main.dat');
         $modal->run();
         $modal_results = $modal->getResults();
         $this->dump('Modal Analysis Done...', true);
